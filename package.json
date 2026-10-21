@@ -1,0 +1,32 @@
+{
+  "name": "reviewdock",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": "^22.18.0 || ^24.11.0",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others --names web,api --prefix-colors cyan,green \"npm run dev --workspace=@reviewdock/web\" \"npm run dev --workspace=@reviewdock/api\"",
+    "dev:web": "npm run dev --workspace=@reviewdock/web",
+    "dev:api": "npm run dev --workspace=@reviewdock/api",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "npm run lint --workspaces",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run format:check && npm run lint && npm run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^24.0.0",
+    "concurrently": "^10.0.6",
+    "eslint": "^9.39.0",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.0"
+  }
+}
