@@ -13,4 +13,10 @@ Thumbs.db
 .idea/
 .vscode/
 apps/api/src/generated/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/.runtime/
+/e2e/.auth/
 

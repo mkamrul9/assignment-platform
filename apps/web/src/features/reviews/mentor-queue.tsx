@@ -265,7 +265,9 @@ const FILTERS: Array<{ value: QueueStatusFilter; label: string }> = [
 
 export function MentorQueue() {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const noteFieldId = useId();
+  const dialogTitleId = useId();
 
   const [filter, setFilter] = useState<QueueStatusFilter>("PENDING");
   const [page, setPage] = useState(1);
@@ -295,19 +297,31 @@ export function MentorQueue() {
     [page, pageSize, filter],
   );
 
-  function openDialog(submission: QueueSubmission) {
+  function openDialog(submission: QueueSubmission, trigger?: HTMLElement | null) {
+    triggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
     setSelected(submission);
     setNote(submission.review?.note ?? "");
     setNoteError(null);
     setFormError(null);
     setSuccessMessage(null);
-    dialogRef.current?.showModal();
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    queueMicrotask(() => {
+      const initial = dialog?.querySelector<HTMLElement>("[data-dialog-initial-focus]");
+      initial?.focus();
+    });
   }
 
   function closeDialog() {
     dialogRef.current?.close();
+  }
+
+  function handleDialogClose() {
+    const trigger = triggerRef.current;
+    triggerRef.current = null;
     setSelected(null);
     setSaving(false);
+    trigger?.focus?.();
   }
 
   function changeFilter(next: QueueStatusFilter) {
@@ -431,7 +445,7 @@ export function MentorQueue() {
   const { stats, queue } = state;
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 max-w-full space-y-8">
       <section aria-label="Review statistics">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold tracking-tight">Workspace totals</h2>
@@ -587,7 +601,7 @@ export function MentorQueue() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => openDialog(submission)}
+                        onClick={(event) => openDialog(submission, event.currentTarget)}
                       >
                         {submission.status === "PENDING" ? "Review" : "View"}
                       </Button>
@@ -631,11 +645,9 @@ export function MentorQueue() {
 
       <dialog
         ref={dialogRef}
-        className="w-[min(100%,36rem)] rounded-xl border bg-card p-0 text-foreground shadow-lg backdrop:bg-foreground/40"
-        onClose={() => {
-          setSelected(null);
-          setSaving(false);
-        }}
+        aria-labelledby={dialogTitleId}
+        className="w-[min(100%,36rem)] max-h-[min(90vh,40rem)] overflow-y-auto rounded-xl border bg-card p-0 text-foreground shadow-lg backdrop:bg-foreground/40"
+        onClose={handleDialogClose}
       >
         {selected ? (
           <form className="space-y-5 p-6" onSubmit={onDialogSubmit}>
@@ -644,12 +656,20 @@ export function MentorQueue() {
                 <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">
                   {statusLabel(selected.status)}
                 </p>
-                <h3 className="mt-2 font-serif text-2xl tracking-tight">{selected.projectName}</h3>
+                <h3 id={dialogTitleId} className="mt-2 font-serif text-2xl tracking-tight">
+                  {selected.projectName}
+                </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {selected.owner.name} · {selected.owner.email}
                 </p>
               </div>
-              <Button type="button" variant="ghost" size="sm" onClick={closeDialog}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-dialog-initial-focus
+                onClick={closeDialog}
+              >
                 Close
               </Button>
             </div>

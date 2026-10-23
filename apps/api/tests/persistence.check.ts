@@ -320,6 +320,32 @@ async function runChecks(databaseUrl: string): Promise<void> {
     const stillStudent = await prisma.user.findUniqueOrThrow({ where: { email: studentEmail } });
     assert(stillStudent.role === Role.STUDENT, "student must not be promoted to mentor");
 
+    // Deleting a mentor who still has reviews must be restricted.
+    await expectRejection(
+      () => prisma.user.delete({ where: { id: mentor.id } }),
+      "P2003",
+      "mentor with reviews cannot be deleted",
+    );
+
+    // Deleting a student cascades to submissions and their reviews.
+    const reviewBeforeDelete = await prisma.review.findUnique({
+      where: { submissionId: submission.id },
+    });
+    assert(reviewBeforeDelete, "review must exist before owner delete");
+    await prisma.user.delete({ where: { id: student.id } });
+    assert(
+      (await prisma.submission.count({ where: { id: submission.id } })) === 0,
+      "deleting a student must cascade to submissions",
+    );
+    assert(
+      (await prisma.review.count({ where: { submissionId: submission.id } })) === 0,
+      "deleting a student must cascade to reviews",
+    );
+    assert(
+      (await prisma.user.count({ where: { id: mentor.id } })) === 1,
+      "mentor must remain after student cascade delete",
+    );
+
     console.info("Persistence checks passed.");
   } finally {
     await prisma.$disconnect();

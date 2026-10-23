@@ -4,9 +4,9 @@
 
 Next.js owns presentation, navigation, and form interaction. Express owns validation, authentication, authorization, business rules, and database access. PostgreSQL is accessed only from the API through Prisma.
 
-The browser calls `/api/*` on the web origin. Next.js forwards those requests to Express using its server-only `API_INTERNAL_URL`. This keeps cookies on one browser origin and avoids requiring a public API hostname during development.
+The browser calls `/api/*` on the web origin. Next.js forwards those requests to Express through `apps/web/src/app/api/[...path]/route.ts` using server-only `API_INTERNAL_URL`. The proxy preserves `Origin`, `Cookie`, and `Set-Cookie` so Express trusted-origin checks and session cookies stay aligned with the public web origin. This avoids requiring a public API hostname during development.
 
-Implemented so far: health, persistence, authentication, student submissions, and mentor reviews (`GET /api/reviews/submissions`, `GET /api/reviews/stats`, `POST /api/reviews/submissions/:id/decision`).
+Implemented so far: health, persistence, authentication, student submissions, mentor reviews, Playwright e2e coverage, and CI configuration.
 
 ## Structure
 
@@ -24,6 +24,7 @@ apps/
           student/page.tsx
           student/submit/page.tsx
           mentor/page.tsx
+        api/[...path]/route.ts    Proxy to Express with Origin/Cookie forwarding
         globals.css
         layout.tsx
         page.tsx
@@ -65,8 +66,11 @@ apps/
       auth.check.ts
       submissions.check.ts
       reviews.check.ts
+e2e/                              Playwright harness and specs
+.github/workflows/ci.yml
 compose.yaml                      Local PostgreSQL with persistent volume
 docs/
+  screenshots/                    Synthetic UI captures from e2e
 ```
 
 PostgreSQL runs through Docker Compose. Prisma ORM 7 generates an ESM client into `apps/api/src/generated/prisma` (gitignored) and connects with `@prisma/adapter-pg`. Database access stays inside the Express workspace. Deleting a user cascades to their submissions; deleting a submission cascades to its review; deleting a mentor who still has reviews is restricted.
@@ -108,9 +112,9 @@ The paginated response contains rows and pagination metadata. Statistics cover t
 
 ## Verification strategy
 
-The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`. Phase 3 adds `npm run auth:check`. Phase 4 adds `npm run submissions:check`. Phase 5 adds `npm run reviews:check` for mentor authorization, query validation, server-side pagination/filters, global stats, approval/rejection rules, trusted-Origin protection, concurrent decision races, transaction rollback, and student visibility of decisions through `/mine`.
+The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`. Phase 3 adds `npm run auth:check`. Phase 4 adds `npm run submissions:check`. Phase 5 adds `npm run reviews:check`. Phase 6 adds Playwright (`npm run test:e2e`) against a disposable database with real Next.js + Express processes, plus `.github/workflows/ci.yml`.
 
-Integration tests should use an isolated PostgreSQL database. Tests that replace Prisma with mocks cannot prove database constraints or transactions work. Browser checks cover the connected student submit and mentor review journey on `/mentor`.
+Integration tests use isolated PostgreSQL databases and clean up after failures. Browser checks cover signup/login, submission validation, mentor filters/pagination/decisions, keyboard dialog focus, mobile viewports, intercepted failure/retry paths, and session-expiry navigation. Screenshots live under `docs/screenshots/`.
 
 The foundation uses ESLint 9 because the React, import, and accessibility plugins bundled by Next.js 16.4.2 declare support through that major version. npm currently emits a deprecation notice for ESLint 9. Move to ESLint 10 when those plugins support it; do not bypass their peer requirements.
 

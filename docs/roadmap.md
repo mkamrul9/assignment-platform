@@ -72,17 +72,17 @@ Commit: `feat: add the mentor review queue and decisions`
 
 ## 6. Verification and delivery
 
-- [ ] Complete integration tests for authorization, duplicate races, limits, filters, and review conflicts.
-- [ ] Add browser coverage for signup, submission, mentor login, and a review decision.
-- [ ] Check keyboard navigation, mobile layouts, empty states, and failures.
-- [ ] Add CI for checks, builds, and database-backed tests.
-- [ ] Document deployment settings, migrations, cookie security, and proxy configuration.
-- [ ] Verify the complete flow against a fresh PostgreSQL database.
-- [ ] Add final screenshots, API examples, and known tradeoffs to the README.
+- [x] Complete integration tests for authorization, duplicate races, limits, filters, and review conflicts.
+- [x] Add browser coverage for signup, submission, mentor login, and a review decision.
+- [x] Check keyboard navigation, mobile layouts, empty states, and failures.
+- [x] Add CI for checks, builds, and database-backed tests.
+- [x] Document deployment settings, migrations, cookie security, and proxy configuration.
+- [x] Verify the complete flow against a fresh PostgreSQL database.
+- [x] Add final screenshots, API examples, and known tradeoffs to the README.
 - [ ] Push to the intended GitHub repository and verify access.
 - [ ] Make the repository public after the assessment deadline and verify signed-out access.
 
-Completion: another developer can follow the README from a fresh clone, and the deployed or locally demonstrated flow works end to end.
+Local verification is complete. GitHub push, observed CI on GitHub Actions, and post-deadline public visibility remain open until a remote URL, push authorization, and deadline are supplied.
 
 Possible commits: `test: cover the submission and review lifecycle`, `ci: verify the web and API workspaces`, `docs: document setup and delivery`
 

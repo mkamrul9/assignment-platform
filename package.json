@@ -29,10 +29,13 @@
     "db:check": "npm run db:check --workspace=@reviewdock/api",
     "auth:check": "npm run auth:check --workspace=@reviewdock/api",
     "submissions:check": "npm run submissions:check --workspace=@reviewdock/api",
-    "reviews:check": "npm run reviews:check --workspace=@reviewdock/api"
+    "reviews:check": "npm run reviews:check --workspace=@reviewdock/api",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:ui": "npm run build && playwright test --ui"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.64.1",
     "@types/node": "^24.0.0",
     "concurrently": "^10.0.6",
     "eslint": "^9.39.0",

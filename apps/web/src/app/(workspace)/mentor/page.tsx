@@ -7,7 +7,7 @@ export default function MentorWorkspacePage() {
   return (
     <RequireAuth role="MENTOR">
       {(user) => (
-        <section className="max-w-6xl">
+        <section className="min-w-0 max-w-6xl">
           <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">
             Mentor workspace
           </p>
