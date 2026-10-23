@@ -18,12 +18,12 @@ Commit: `chore: set up ReviewDock web and API workspaces`
 
 ## 2. Persistence
 
-- [ ] Add PostgreSQL development setup with Docker Compose.
-- [ ] Configure stable Prisma, migrations, and a shared API database client.
-- [ ] Model users, submissions, and review decisions with database constraints.
-- [ ] Add indexes for the review queue and status filtering.
-- [ ] Seed a mentor using credentials supplied through the environment.
-- [ ] Document database creation, migration, seed, and reset commands.
+- [x] Add PostgreSQL development setup with Docker Compose.
+- [x] Configure stable Prisma, migrations, and a shared API database client.
+- [x] Model users, submissions, and review decisions with database constraints.
+- [x] Add indexes for the review queue and status filtering.
+- [x] Seed a mentor using credentials supplied through the environment.
+- [x] Document database creation, migration, seed, and reset commands.
 
 Completion: a fresh database can migrate and seed; constraints reject duplicate emails and canonical repository URLs. Re-running the seed is safe.
 

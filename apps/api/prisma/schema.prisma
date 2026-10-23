@@ -1,0 +1,74 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  MENTOR
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReviewDecision {
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(320)
+  passwordHash String   @map("password_hash")
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  submissions Submission[] @relation("SubmissionOwner")
+  reviews     Review[]     @relation("ReviewMentor")
+
+  @@map("users")
+}
+
+model Submission {
+  id                   String           @id @default(cuid())
+  ownerId              String           @map("owner_id")
+  projectName          String           @map("project_name") @db.VarChar(100)
+  repositoryUrl        String           @map("repository_url") @db.VarChar(2048)
+  canonicalRepositoryUrl String         @unique @map("canonical_repository_url") @db.VarChar(2048)
+  liveUrl              String           @map("live_url") @db.VarChar(2048)
+  description          String           @db.VarChar(5000)
+  status               SubmissionStatus @default(PENDING)
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  owner  User    @relation("SubmissionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  review Review?
+
+  @@index([ownerId, createdAt(sort: Desc), id(sort: Desc)], map: "submissions_owner_created_idx")
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "submissions_status_created_idx")
+  @@map("submissions")
+}
+
+model Review {
+  id           String         @id @default(cuid())
+  submissionId String         @unique @map("submission_id")
+  mentorId     String         @map("mentor_id")
+  decision     ReviewDecision
+  note         String?        @db.VarChar(1000)
+  reviewedAt   DateTime       @default(now()) @map("reviewed_at")
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  mentor     User       @relation("ReviewMentor", fields: [mentorId], references: [id], onDelete: Restrict)
+
+  @@index([mentorId], map: "reviews_mentor_idx")
+  @@map("reviews")
+}

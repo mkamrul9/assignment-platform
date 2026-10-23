@@ -6,7 +6,7 @@ Students will submit a repository, live link, and project description. Mentors w
 
 ## Current progress
 
-Phase 1: the development foundation. The web app has a small introductory page; the API has a health endpoint and JSON error responses. Authentication, persistence, submissions, and reviews are planned in separate phases.
+Phase 2: PostgreSQL persistence with Prisma. The schema, committed migration, mentor seed, and database integration checks are in place. Authentication, submissions, and reviews are planned in later phases.
 
 - [Roadmap and completion criteria](docs/roadmap.md)
 - [Architecture and planned structure](docs/architecture.md)
@@ -17,10 +17,10 @@ Phase 1: the development foundation. The web app has a small introductory page; 
 - TypeScript throughout
 - Next.js App Router, Tailwind CSS, and shadcn/ui
 - Express.js as the application API
-- PostgreSQL and Prisma ORM, added in phase 2
-- JWT authentication with student and mentor roles, added in phase 3
+- PostgreSQL and Prisma ORM (phase 2)
+- JWT authentication with student and mentor roles, planned for phase 3
 
-The repository uses npm workspaces. The frontend and API can run independently; neither needs a database during phase 1.
+The repository uses npm workspaces. The frontend and API can run without a database for the health check and introductory page. Database commands require local PostgreSQL.
 
 The Next.js scripts explicitly use Webpack. Turbopack's CSS worker failed during setup on this Windows machine; the supported Webpack build passes with the same application code.
 
@@ -30,32 +30,68 @@ Use Node.js 24.11.1 (see `.nvmrc`) and npm 10 or newer. Node.js 22.18 or newer i
 
 ```sh
 npm ci
+npm run db:up
+npm run db:migrate:deploy
+npm run db:seed
 npm run dev
 ```
 
 Open [localhost:3000](http://localhost:3000). The Express API runs on port 4000.
 
-Configuration is optional for the foundation. To change the defaults, copy `apps/api/.env.example` to `apps/api/.env` and `apps/web/.env.example` to `apps/web/.env.local`. Environment files are ignored by Git.
+### Environment files
+
+Copy the examples before changing defaults. Environment files are ignored by Git.
+
+```sh
+cp .env.example .env
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
+```
 
 On Windows PowerShell:
 
 ```powershell
+Copy-Item .env.example .env
 Copy-Item apps/api/.env.example apps/api/.env
 Copy-Item apps/web/.env.example apps/web/.env.local
 ```
 
-`API_INTERNAL_URL` belongs to the Next.js server, and should point to the Express origin. Browser requests use relative `/api` URLs. Restart the web server after changing its environment; production rewrites are set when building the web app.
+Defaults:
+
+| Variable                                              | Default                                                                      | Where                        |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------- |
+| `POSTGRES_PORT`                                       | `5432`                                                                       | root `.env` / `compose.yaml` |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `reviewdock`                                                                 | root `.env` / `compose.yaml` |
+| `DATABASE_URL`                                        | `postgresql://reviewdock:reviewdock@127.0.0.1:5432/reviewdock?schema=public` | `apps/api/.env`              |
+| `PORT`                                                | `4000`                                                                       | `apps/api/.env`              |
+| `API_INTERNAL_URL`                                    | `http://127.0.0.1:4000`                                                      | `apps/web/.env.local`        |
+| `MENTOR_NAME` / `MENTOR_EMAIL` / `MENTOR_PASSWORD`    | example placeholders                                                         | `apps/api/.env` (seed only)  |
+
+If host port `5432` is already in use, set `POSTGRES_PORT` in the root `.env` and the matching host port in `apps/api/.env` `DATABASE_URL`.
+
+`API_INTERNAL_URL` belongs to the Next.js server. Browser requests use relative `/api` URLs. Prisma CLI commands, the API, and the seed script all load `apps/api/.env` from that package directory, including when invoked through root npm scripts.
 
 ### Commands
 
 ```sh
-npm run dev          # Run both apps; Ctrl+C stops them
-npm run dev:web      # Run only Next.js
-npm run dev:api      # Run only Express
-npm run check        # Formatting, linting, and TypeScript checks
-npm run build        # Production builds for both workspaces
-npm run format       # Format tracked source and documentation
+npm run dev              # Run both apps; Ctrl+C stops them
+npm run dev:web          # Run only Next.js
+npm run dev:api          # Run only Express
+npm run check            # Formatting, linting, and TypeScript checks
+npm run build            # Production builds for both workspaces
+npm run format           # Format tracked source and documentation
+
+npm run db:up            # Start local PostgreSQL (Docker Compose)
+npm run db:down          # Stop PostgreSQL without deleting the volume
+npm run db:generate      # Generate the Prisma client
+npm run db:migrate       # Create/apply development migrations (prisma migrate dev)
+npm run db:migrate:deploy # Apply committed migrations
+npm run db:seed          # Seed the mentor account from apps/api/.env
+npm run db:reset         # Destructive: drop data, re-apply migrations (does not auto-seed)
+npm run db:check         # Isolated disposable-DB integration checks
 ```
+
+`npm run db:down` stops the container and keeps the named Docker volume. It does not remove volumes or wipe an existing database. `npm run db:reset` is destructive for the database named in `DATABASE_URL`; use it only on disposable development data. After a reset, run `npm run db:seed` again if you need the mentor account. Prisma 7 does not seed automatically after migrate or reset.
 
 After building, start each service in its own terminal:
 
@@ -66,7 +102,7 @@ npm run start --workspace=@reviewdock/web
 
 ### API health
 
-Both addresses should return the same response while the two services are running:
+Both addresses should return the same response while the two services are running. Neither requires PostgreSQL:
 
 - [Direct API health](http://localhost:4000/api/health)
 - [Health through the web server](http://localhost:3000/api/health)
@@ -75,7 +111,9 @@ Both addresses should return the same response while the two services are runnin
 { "status": "ok", "service": "reviewdock-api" }
 ```
 
-This is a liveness check for Express. It does not check a database connection.
+### Mentor seed
+
+Set `MENTOR_NAME`, `MENTOR_EMAIL`, and `MENTOR_PASSWORD` in `apps/api/.env`, then run `npm run db:seed`. The email is normalized before storage. The password is hashed with bcrypt. Re-running the seed leaves an existing mentor unchanged and does not reset the password. If the email already belongs to a student, the seed fails instead of granting mentor access.
 
 ## Repository layout
 
@@ -86,11 +124,15 @@ apps/
     src/components/ui/  Reusable UI primitives
     src/lib/            Frontend utilities
   api/                  Express application
+    prisma/             Schema, migrations, and mentor seed
     src/config/         Validated environment settings
+    src/lib/prisma.ts   Shared Prisma client
     src/middleware/     Shared HTTP middleware
     src/modules/        Feature modules, starting with health
     src/app.ts          Application wiring
     src/server.ts       Process startup and shutdown
+    tests/              Database integration checks
+compose.yaml            Local PostgreSQL
 docs/                   Roadmap, architecture, and product decisions
 ```
 

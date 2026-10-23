@@ -6,9 +6,9 @@ Next.js owns presentation, navigation, and form interaction. Express owns valida
 
 The browser calls `/api/*` on the web origin. Next.js forwards those requests to Express using its server-only `API_INTERNAL_URL`. This keeps cookies on one browser origin and avoids requiring a public API hostname during development.
 
-The only application endpoint implemented in phase 1 is `GET /api/health`. All other routes and data structures described below are planned.
+The only application endpoint implemented so far is `GET /api/health`. Persistence models, migrations, and the mentor seed exist in phase 2. Authentication routes and feature screens remain planned.
 
-## Planned structure
+## Structure
 
 Add feature directories when their phase starts. Empty service or controller layers are unnecessary until there is work for them to do.
 
@@ -17,10 +17,10 @@ apps/
   web/
     src/
       app/
-        (auth)/
+        (auth)/                   Planned
           login/page.tsx
           signup/page.tsx
-        (workspace)/
+        (workspace)/              Planned
           student/page.tsx
           student/submit/page.tsx
           mentor/page.tsx
@@ -29,38 +29,38 @@ apps/
         page.tsx
       components/
         ui/                       shadcn/ui primitives
-        layout/                   Shared workspace navigation
-      features/
-        auth/                     Auth forms and session access
-        submissions/              Submission form and student project list
-        reviews/                  Review table, filters, and decision dialog
+        layout/                   Planned shared workspace navigation
+      features/                   Planned auth, submissions, reviews UI
       lib/
-        api.ts                    Shared browser request and error handling
         utils.ts
   api/
     prisma/
-      schema.prisma
+      schema.prisma               Users, submissions, reviews
       migrations/
-      seed.ts
+      seed.ts                     Mentor account from environment
+    prisma.config.ts              Prisma CLI datasource and seed config
     src/
       config/env.ts
-      lib/prisma.ts
+      lib/prisma.ts               Shared Prisma client (driver adapter)
       middleware/
-        authenticate.ts
-        require-role.ts
-        rate-limits.ts
         error-handler.ts
+        authenticate.ts           Planned
+        require-role.ts           Planned
+        rate-limits.ts            Planned
       modules/
         health/
-        auth/
-        submissions/
-        reviews/
+        auth/                     Planned
+        submissions/              Planned
+        reviews/                  Planned
       app.ts
       server.ts
-    tests/                        API integration tests
+    tests/
+      persistence.check.ts        Isolated database constraint checks
+compose.yaml                      Local PostgreSQL with persistent volume
 docs/
-compose.yaml                      Local PostgreSQL, added in phase 2
 ```
+
+PostgreSQL runs through Docker Compose. Prisma ORM 7 generates an ESM client into `apps/api/src/generated/prisma` (gitignored) and connects with `@prisma/adapter-pg`. Database access stays inside the Express workspace. Deleting a user cascades to their submissions; deleting a submission cascades to its review; deleting a mentor who still has reviews is restricted.
 
 Each API feature will keep its routes, input schemas, and business logic together. Controllers and services can be separate files when their size justifies it. Start with direct Prisma calls inside feature services; a generic repository abstraction adds little value for this assessment.
 
@@ -93,10 +93,10 @@ The paginated response will contain rows and pagination metadata. Statistics cov
 
 ## Verification strategy
 
-The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Feature phases will add tests around behavior that can fail in meaningful ways: permission boundaries, expired JWTs, database uniqueness under concurrency, pagination, rate limits, and atomic review transitions.
+The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`, which creates a disposable PostgreSQL database, applies committed migrations, and asserts uniqueness, foreign keys, default status, and safe mentor seeding against the real database. Feature phases will add tests around behavior that can fail in meaningful ways: permission boundaries, expired JWTs, database uniqueness under concurrency, pagination, rate limits, and atomic review transitions.
 
 Integration tests should use an isolated PostgreSQL database. Tests that replace Prisma with mocks cannot prove database constraints or transactions work. Browser tests will cover the connected student and mentor journeys once those screens exist.
 
 The foundation uses ESLint 9 because the React, import, and accessibility plugins bundled by Next.js 16.4.2 declare support through that major version. npm currently emits a deprecation notice for ESLint 9. Move to ESLint 10 when those plugins support it; do not bypass their peer requirements.
 
-Reference documentation used for the foundation: [Next.js installation](https://nextjs.org/docs/app/getting-started/installation), [Tailwind with Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs), [shadcn/ui setup](https://ui.shadcn.com/docs/installation/next), and [Express setup](https://expressjs.com/en/starter/hello-world/).
+Reference documentation: [Next.js installation](https://nextjs.org/docs/app/getting-started/installation), [Tailwind with Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs), [shadcn/ui setup](https://ui.shadcn.com/docs/installation/next), [Express setup](https://expressjs.com/en/starter/hello-world/), and [Prisma PostgreSQL quickstart](https://www.prisma.io/docs/orm/overview/databases/postgresql).
