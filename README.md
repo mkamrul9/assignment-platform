@@ -39,12 +39,14 @@ Browsers call relative `/api/*` on the web origin. Next.js forwards those reques
 Use Node.js 24.11.1 (see `.nvmrc`) and npm 10 or newer. Node.js 22.18 or newer in the 22.x line is also supported.
 
 ```sh
-npm ci
+npm ci --include=dev
 npm run db:up
 npm run db:migrate:deploy
 npm run db:seed
 npm run dev
 ```
+
+Use `npm ci --include=dev` (or unset `NODE_ENV`) so workspace `devDependencies` such as Tailwind and TypeScript types are installed. A shell left with `NODE_ENV=production` makes plain `npm ci` skip those packages.
 
 Open [localhost:3000](http://localhost:3000). The Express API runs on port 4000.
 

@@ -61,7 +61,8 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        # --include=dev keeps workspace devDependencies even if NODE_ENV=production is set.
+        run: npm ci --include=dev
 
       - name: Generate Prisma client
         run: npm run db:generate
