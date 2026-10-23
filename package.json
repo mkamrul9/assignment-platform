@@ -27,7 +27,8 @@
     "db:seed": "npm run db:seed --workspace=@reviewdock/api",
     "db:reset": "npm run db:reset --workspace=@reviewdock/api",
     "db:check": "npm run db:check --workspace=@reviewdock/api",
-    "auth:check": "npm run auth:check --workspace=@reviewdock/api"
+    "auth:check": "npm run auth:check --workspace=@reviewdock/api",
+    "submissions:check": "npm run submissions:check --workspace=@reviewdock/api"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

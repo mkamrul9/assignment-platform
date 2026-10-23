@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { invalidateProjectListCache } from "@/features/submissions/project-list";
 
 import type { AuthUser } from "./types";
 
@@ -101,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setUser = useCallback((next: AuthUser | null) => {
+    invalidateProjectListCache();
     writeSession({
       status: next ? "authenticated" : "anonymous",
       user: next,
@@ -113,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Still clear local session state if the cookie is already gone.
     }
+    invalidateProjectListCache();
     writeSession({ status: "anonymous", user: null });
   }, []);
 

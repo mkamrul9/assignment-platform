@@ -45,12 +45,12 @@ Commit: `feat: add student authentication and mentor access`
 
 ## 4. Student submissions
 
-- [ ] Add the authenticated submission endpoint and the student's own project list.
-- [ ] Validate project name, repository URL, live link, and description.
-- [ ] Normalize repository URLs and handle unique-constraint conflicts as HTTP 409.
-- [ ] Apply a submission rate limit with a clear retry response.
-- [ ] Build the submission form, field errors, loading states, and confirmation.
-- [ ] Show each student's submitted projects, status, and any review feedback.
+- [x] Add the authenticated submission endpoint and the student's own project list.
+- [x] Validate project name, repository URL, live link, and description.
+- [x] Normalize repository URLs and handle unique-constraint conflicts as HTTP 409.
+- [x] Apply a submission rate limit with a clear retry response.
+- [x] Build the submission form, field errors, loading states, and confirmation.
+- [x] Show each student's submitted projects, status, and any review feedback.
 
 Completion: a student can submit a valid project and see it after reload. Invalid links fail validation. Equivalent repository URLs and concurrent duplicate requests create at most one submission. Students cannot read another student's projects.
 

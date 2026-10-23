@@ -14,7 +14,7 @@ All four project fields are required. Planned limits are 3–100 characters for 
 
 A student may submit multiple distinct projects. A repository may appear only once across the workspace, even after rejection. Team submissions, edits, deletion, and resubmission are outside the initial scope.
 
-Canonical repository URLs ignore trailing slashes, a final `.git`, query parameters, and fragments. Hosts are normalized; GitHub owner and repository names are case-insensitive. Preserve path case for other hosts. The URL rules will have explicit examples and tests in the submission phase. A database unique constraint handles races; a disabled submit button alone cannot prevent duplicates.
+Canonical repository URLs ignore trailing slashes, a final `.git`, query parameters, and fragments. Hosts are normalized; GitHub owner and repository names are case-insensitive. Preserve path case for other hosts. Explicit examples live in `apps/api/src/lib/canonical-repository-url.ts` and `npm run submissions:check`. A database unique constraint handles races; a disabled submit button alone cannot prevent duplicates.
 
 The server validates links but does not fetch them. GitHub verification and ownership checks are outside this assessment's requested scope.
 

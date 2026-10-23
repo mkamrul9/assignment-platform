@@ -18,7 +18,8 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
     "db:check": "tsx tests/persistence.check.ts",
-    "auth:check": "tsx tests/auth.check.ts"
+    "auth:check": "tsx tests/auth.check.ts",
+    "submissions:check": "tsx tests/submissions.check.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",

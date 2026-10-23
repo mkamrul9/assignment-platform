@@ -6,6 +6,7 @@ import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
+import { createSubmissionsRouter } from "./modules/submissions/submissions.routes.js";
 import { roleBoundaryRouter } from "./modules/test/role-boundary.routes.js";
 
 export function createApp() {
@@ -19,11 +20,13 @@ export function createApp() {
   }
 
   app.use(helmet());
-  app.use(express.json({ limit: "16kb" }));
+  // Large enough for max-length Unicode submission bodies (name + URLs + description).
+  app.use(express.json({ limit: "64kb" }));
   app.use(cookieParser());
 
   app.use("/api/health", healthRouter);
   app.use("/api/auth", createAuthRouter());
+  app.use("/api/submissions", createSubmissionsRouter());
 
   if (env.NODE_ENV === "test") {
     app.use("/api/test", roleBoundaryRouter);

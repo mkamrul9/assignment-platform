@@ -45,6 +45,11 @@ export function SiteHeader() {
 
         {status === "authenticated" && user ? (
           <>
+            {user.role === "STUDENT" ? (
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/student/submit">Submit</Link>
+              </Button>
+            ) : null}
             <Link
               href={user.role === "MENTOR" ? "/mentor" : "/student"}
               className="hidden text-sm text-muted-foreground hover:text-foreground sm:inline"

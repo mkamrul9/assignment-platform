@@ -6,7 +6,7 @@ Students will submit a repository, live link, and project description. Mentors w
 
 ## Current progress
 
-Phase 3: student authentication and mentor access. Students can sign up and sign in; the seeded mentor can sign in; sessions use HttpOnly JWT cookies through the Next.js `/api` proxy. Submissions and reviews are planned next.
+Phase 4: student project submissions. Authenticated students can submit a repository, live link, and description, then see their own projects and any review feedback. Mentor review actions are planned next.
 
 - [Roadmap and completion criteria](docs/roadmap.md)
 - [Architecture and planned structure](docs/architecture.md)
@@ -100,6 +100,7 @@ npm run db:seed          # Seed the mentor account from apps/api/.env
 npm run db:reset         # Destructive: drop data, re-apply migrations (does not auto-seed)
 npm run db:check         # Isolated disposable-DB persistence checks
 npm run auth:check       # Isolated disposable-DB authentication checks
+npm run submissions:check # Isolated disposable-DB submission checks
 ```
 
 `npm run db:down` stops the container and keeps the named Docker volume. `npm run db:reset` is destructive for the database named in `DATABASE_URL`. After a reset, run `npm run db:seed` again if you need the mentor account.
@@ -113,9 +114,16 @@ npm run auth:check       # Isolated disposable-DB authentication checks
 
 Sessions are 30-minute JWTs in the `reviewdock_session` HttpOnly cookie (`SameSite=Lax`, `Path=/`, `Secure` in production). Logout clears the browser cookie; a copied token remains valid until expiry. Passwords are at least 8 characters and at most 72 UTF-8 bytes (bcrypt’s input limit) and are never trimmed.
 
-Signup and login are rate-limited in memory (5 signups/hour/IP, 10 logins/15 minutes/IP). That limiter is per API process. `TRUST_PROXY=1` trusts one proxy hop for client IP when requests arrive through Next.js; with `TRUST_PROXY=0`, spoofed `X-Forwarded-For` headers are ignored.
+Signup and login are rate-limited in memory (5 signups/hour/IP, 10 logins/15 minutes/IP). Submission attempts are limited to 5 per 10 minutes per authenticated student (keyed by user id). Those limiters are per API process. `TRUST_PROXY=1` trusts one proxy hop for client IP when requests arrive through Next.js; with `TRUST_PROXY=0`, spoofed `X-Forwarded-For` headers are ignored.
 
-Frontend routes: `/signup`, `/login`, `/student`, `/mentor`.
+### Submissions
+
+- `POST /api/submissions` — student-only create (`201`), trusted Origin required
+- `GET /api/submissions/mine` — that student's projects (`Cache-Control: no-store`)
+
+Create body: `projectName`, `repositoryUrl`, `liveUrl`, `description`. The API stores the submitted repository URL and a server-derived `canonicalRepositoryUrl` used for uniqueness. Equivalent GitHub URLs such as `https://github.com/Owner/Repo`, `https://github.com/owner/repo/`, and `https://github.com/OWNER/REPO.git?tab=readme#top` normalize to `https://github.com/owner/repo`. Non-GitHub hosts keep path case after host normalization. Duplicate canonical URLs return `409` without revealing another student's identity.
+
+Frontend routes: `/signup`, `/login`, `/student`, `/student/submit`, `/mentor`.
 
 ### API health
 
