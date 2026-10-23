@@ -6,7 +6,7 @@ Students will submit a repository, live link, and project description. Mentors w
 
 ## Current progress
 
-Phase 2: PostgreSQL persistence with Prisma. The schema, committed migration, mentor seed, and database integration checks are in place. Authentication, submissions, and reviews are planned in later phases.
+Phase 3: student authentication and mentor access. Students can sign up and sign in; the seeded mentor can sign in; sessions use HttpOnly JWT cookies through the Next.js `/api` proxy. Submissions and reviews are planned next.
 
 - [Roadmap and completion criteria](docs/roadmap.md)
 - [Architecture and planned structure](docs/architecture.md)
@@ -17,10 +17,10 @@ Phase 2: PostgreSQL persistence with Prisma. The schema, committed migration, me
 - TypeScript throughout
 - Next.js App Router, Tailwind CSS, and shadcn/ui
 - Express.js as the application API
-- PostgreSQL and Prisma ORM (phase 2)
-- JWT authentication with student and mentor roles, planned for phase 3
+- PostgreSQL and Prisma ORM
+- JWT cookie sessions (`jose`) with student and mentor roles
 
-The repository uses npm workspaces. The frontend and API can run without a database for the health check and introductory page. Database commands require local PostgreSQL.
+The repository uses npm workspaces. The homepage and `GET /api/health` do not require PostgreSQL. Authentication and later features do.
 
 The Next.js scripts explicitly use Webpack. Turbopack's CSS worker failed during setup on this Windows machine; the supported Webpack build passes with the same application code.
 
@@ -40,7 +40,7 @@ Open [localhost:3000](http://localhost:3000). The Express API runs on port 4000.
 
 ### Environment files
 
-Copy the examples before changing defaults. Environment files are ignored by Git.
+Copy the examples before changing defaults. Environment files are ignored by Git. If you already have a working `apps/api/.env`, keep its `DATABASE_URL` host port and add any new keys from `.env.example`.
 
 ```sh
 cp .env.example .env
@@ -56,6 +56,12 @@ Copy-Item apps/api/.env.example apps/api/.env
 Copy-Item apps/web/.env.example apps/web/.env.local
 ```
 
+Generate a session secret and put it in `apps/api/.env`:
+
+```sh
+openssl rand -base64 48
+```
+
 Defaults:
 
 | Variable                                              | Default                                                                      | Where                        |
@@ -65,11 +71,15 @@ Defaults:
 | `DATABASE_URL`                                        | `postgresql://reviewdock:reviewdock@127.0.0.1:5432/reviewdock?schema=public` | `apps/api/.env`              |
 | `PORT`                                                | `4000`                                                                       | `apps/api/.env`              |
 | `API_INTERNAL_URL`                                    | `http://127.0.0.1:4000`                                                      | `apps/web/.env.local`        |
-| `MENTOR_NAME` / `MENTOR_EMAIL` / `MENTOR_PASSWORD`    | example placeholders                                                         | `apps/api/.env` (seed only)  |
+| `JWT_SECRET`                                          | _(required, generate locally)_                                               | `apps/api/.env`              |
+| `JWT_ISSUER` / `JWT_AUDIENCE`                         | `reviewdock` / `reviewdock-web`                                              | `apps/api/.env`              |
+| `WEB_ORIGINS`                                         | `http://localhost:3000,http://127.0.0.1:3000`                                | `apps/api/.env`              |
+| `TRUST_PROXY`                                         | `1`                                                                          | `apps/api/.env`              |
+| `MENTOR_*`                                            | example placeholders                                                         | `apps/api/.env` (seed only)  |
 
 If host port `5432` is already in use, set `POSTGRES_PORT` in the root `.env` and the matching host port in `apps/api/.env` `DATABASE_URL`.
 
-`API_INTERNAL_URL` belongs to the Next.js server. Browser requests use relative `/api` URLs. Prisma CLI commands, the API, and the seed script all load `apps/api/.env` from that package directory, including when invoked through root npm scripts.
+`API_INTERNAL_URL` belongs to the Next.js server. Browser requests use relative `/api` URLs so cookies stay on the web origin. Prisma CLI commands, the API, and the seed script load `apps/api/.env` from that package directory.
 
 ### Commands
 
@@ -84,21 +94,28 @@ npm run format           # Format tracked source and documentation
 npm run db:up            # Start local PostgreSQL (Docker Compose)
 npm run db:down          # Stop PostgreSQL without deleting the volume
 npm run db:generate      # Generate the Prisma client
-npm run db:migrate       # Create/apply development migrations (prisma migrate dev)
+npm run db:migrate       # Create/apply development migrations
 npm run db:migrate:deploy # Apply committed migrations
 npm run db:seed          # Seed the mentor account from apps/api/.env
 npm run db:reset         # Destructive: drop data, re-apply migrations (does not auto-seed)
-npm run db:check         # Isolated disposable-DB integration checks
+npm run db:check         # Isolated disposable-DB persistence checks
+npm run auth:check       # Isolated disposable-DB authentication checks
 ```
 
-`npm run db:down` stops the container and keeps the named Docker volume. It does not remove volumes or wipe an existing database. `npm run db:reset` is destructive for the database named in `DATABASE_URL`; use it only on disposable development data. After a reset, run `npm run db:seed` again if you need the mentor account. Prisma 7 does not seed automatically after migrate or reset.
+`npm run db:down` stops the container and keeps the named Docker volume. `npm run db:reset` is destructive for the database named in `DATABASE_URL`. After a reset, run `npm run db:seed` again if you need the mentor account.
 
-After building, start each service in its own terminal:
+### Authentication
 
-```sh
-npm run start --workspace=@reviewdock/api
-npm run start --workspace=@reviewdock/web
-```
+- `POST /api/auth/signup` — create a student, set session cookie
+- `POST /api/auth/login` — student or mentor, set session cookie
+- `GET /api/auth/me` — current user (`Cache-Control: no-store`)
+- `POST /api/auth/logout` — clear session cookie
+
+Sessions are 30-minute JWTs in the `reviewdock_session` HttpOnly cookie (`SameSite=Lax`, `Path=/`, `Secure` in production). Logout clears the browser cookie; a copied token remains valid until expiry. Passwords are at least 8 characters and at most 72 UTF-8 bytes (bcrypt’s input limit) and are never trimmed.
+
+Signup and login are rate-limited in memory (5 signups/hour/IP, 10 logins/15 minutes/IP). That limiter is per API process. `TRUST_PROXY=1` trusts one proxy hop for client IP when requests arrive through Next.js; with `TRUST_PROXY=0`, spoofed `X-Forwarded-For` headers are ignored.
+
+Frontend routes: `/signup`, `/login`, `/student`, `/mentor`.
 
 ### API health
 
@@ -121,14 +138,15 @@ Set `MENTOR_NAME`, `MENTOR_EMAIL`, and `MENTOR_PASSWORD` in `apps/api/.env`, the
 apps/
   web/                  Next.js frontend and shadcn/ui components
     src/app/            Routes, root layout, and styles
-    src/components/ui/  Reusable UI primitives
+    src/components/     UI primitives and shared layout
+    src/features/auth/  Session provider, forms, and guards
     src/lib/            Frontend utilities
   api/                  Express application
     prisma/             Schema, migrations, and mentor seed
     src/config/         Validated environment settings
-    src/lib/prisma.ts   Shared Prisma client
-    src/middleware/     Shared HTTP middleware
-    src/modules/        Feature modules, starting with health
+    src/lib/            Prisma client, JWT, cookies, passwords
+    src/middleware/     Auth, origin, rate limits, errors
+    src/modules/        Feature modules (health, auth, …)
     src/app.ts          Application wiring
     src/server.ts       Process startup and shutdown
     tests/              Database integration checks

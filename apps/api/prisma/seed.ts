@@ -22,10 +22,21 @@ const seedEnvSchema = z.object({
     .trim()
     .min(1, "MENTOR_EMAIL is required.")
     .email("MENTOR_EMAIL must be a valid email address."),
-  MENTOR_PASSWORD: z
-    .string()
-    .min(8, "MENTOR_PASSWORD must be at least 8 characters.")
-    .max(200, "MENTOR_PASSWORD must be at most 200 characters."),
+  MENTOR_PASSWORD: z.string().superRefine((value, ctx) => {
+    if (value.length < 8) {
+      ctx.addIssue({
+        code: "custom",
+        message: "MENTOR_PASSWORD must be at least 8 characters.",
+      });
+      return;
+    }
+    if (Buffer.byteLength(value, "utf8") > 72) {
+      ctx.addIssue({
+        code: "custom",
+        message: "MENTOR_PASSWORD must be at most 72 bytes (bcrypt limit).",
+      });
+    }
+  }),
 });
 
 function normalizeEmail(email: string): string {

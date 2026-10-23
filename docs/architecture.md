@@ -6,7 +6,7 @@ Next.js owns presentation, navigation, and form interaction. Express owns valida
 
 The browser calls `/api/*` on the web origin. Next.js forwards those requests to Express using its server-only `API_INTERNAL_URL`. This keeps cookies on one browser origin and avoids requiring a public API hostname during development.
 
-The only application endpoint implemented so far is `GET /api/health`. Persistence models, migrations, and the mentor seed exist in phase 2. Authentication routes and feature screens remain planned.
+Implemented so far: `GET /api/health`, persistence models/migrations/seed, and authentication (`/api/auth/*`) with JWT cookie sessions. Submission and review features remain planned.
 
 ## Structure
 
@@ -17,21 +17,23 @@ apps/
   web/
     src/
       app/
-        (auth)/                   Planned
+        (auth)/
           login/page.tsx
           signup/page.tsx
-        (workspace)/              Planned
+        (workspace)/
           student/page.tsx
-          student/submit/page.tsx
+          student/submit/page.tsx Planned
           mentor/page.tsx
         globals.css
         layout.tsx
         page.tsx
       components/
         ui/                       shadcn/ui primitives
-        layout/                   Planned shared workspace navigation
-      features/                   Planned auth, submissions, reviews UI
+        layout/                   Shared header / navigation
+      features/
+        auth/                     Session provider, forms, guards
       lib/
+        api.ts                    Relative /api fetch helper
         utils.ts
   api/
     prisma/
@@ -44,18 +46,20 @@ apps/
       lib/prisma.ts               Shared Prisma client (driver adapter)
       middleware/
         error-handler.ts
-        authenticate.ts           Planned
-        require-role.ts           Planned
-        rate-limits.ts            Planned
+        authenticate.ts
+        require-role.ts
+        require-trusted-origin.ts
+        rate-limits.ts
       modules/
         health/
-        auth/                     Planned
+        auth/
         submissions/              Planned
         reviews/                  Planned
       app.ts
       server.ts
     tests/
-      persistence.check.ts        Isolated database constraint checks
+      persistence.check.ts
+      auth.check.ts
 compose.yaml                      Local PostgreSQL with persistent volume
 docs/
 ```
@@ -74,7 +78,7 @@ A submission starts pending. Approval or rejection writes the review and changes
 
 ## API outline
 
-These are proposed routes, not completed functionality:
+Auth and health are implemented. Submission and review routes remain proposed:
 
 ```text
 GET    /api/health
@@ -82,18 +86,18 @@ POST   /api/auth/signup
 POST   /api/auth/login
 POST   /api/auth/logout
 GET    /api/auth/me
-POST   /api/submissions
-GET    /api/submissions/mine
-GET    /api/reviews/submissions?page=1&pageSize=10&status=PENDING
-GET    /api/reviews/stats
-POST   /api/reviews/submissions/:id/decision
+POST   /api/submissions                      Planned
+GET    /api/submissions/mine                 Planned
+GET    /api/reviews/submissions?...          Planned
+GET    /api/reviews/stats                    Planned
+POST   /api/reviews/submissions/:id/decision Planned
 ```
 
 The paginated response will contain rows and pagination metadata. Statistics cover the whole review queue, independent of the selected filter. Filter changes reset the UI to page 1, and list ordering uses creation time plus ID to make ties deterministic.
 
 ## Verification strategy
 
-The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`, which creates a disposable PostgreSQL database, applies committed migrations, and asserts uniqueness, foreign keys, default status, and safe mentor seeding against the real database. Feature phases will add tests around behavior that can fail in meaningful ways: permission boundaries, expired JWTs, database uniqueness under concurrency, pagination, rate limits, and atomic review transitions.
+The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`. Phase 3 adds `npm run auth:check` for signup/login/session/origin/rate-limit behavior against a disposable database, plus a browser journey through the Next.js `/api` proxy. Later feature phases will deepen concurrency, pagination, and review-transition coverage.
 
 Integration tests should use an isolated PostgreSQL database. Tests that replace Prisma with mocks cannot prove database constraints or transactions work. Browser tests will cover the connected student and mentor journeys once those screens exist.
 

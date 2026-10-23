@@ -17,19 +17,24 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
-    "db:check": "tsx tests/persistence.check.ts"
+    "db:check": "tsx tests/persistence.check.ts",
+    "auth:check": "tsx tests/auth.check.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^17.0.0",
     "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
     "helmet": "^8.0.0",
+    "jose": "^6.2.13",
     "pg": "^8.23.1",
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/pg": "^8.23.1",
     "prisma": "^7.10.1",

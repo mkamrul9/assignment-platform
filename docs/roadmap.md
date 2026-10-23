@@ -31,13 +31,13 @@ Commit: `feat: add project and reviewer persistence`
 
 ## 3. Authentication
 
-- [ ] Implement student signup, login, current-user lookup, and logout.
-- [ ] Hash passwords and validate all authentication input on the server.
-- [ ] Issue expiring JWTs in HttpOnly cookies, with production Secure settings.
-- [ ] Enforce student and mentor permissions in Express middleware.
-- [ ] Protect cookie-authenticated mutations against cross-origin requests.
-- [ ] Rate-limit signup and login; return useful, non-sensitive errors.
-- [ ] Build connected, accessible login and signup pages with role-aware navigation.
+- [x] Implement student signup, login, current-user lookup, and logout.
+- [x] Hash passwords and validate all authentication input on the server.
+- [x] Issue expiring JWTs in HttpOnly cookies, with production Secure settings.
+- [x] Enforce student and mentor permissions in Express middleware.
+- [x] Protect cookie-authenticated mutations against cross-origin requests.
+- [x] Rate-limit signup and login; return useful, non-sensitive errors.
+- [x] Build connected, accessible login and signup pages with role-aware navigation.
 
 Completion: a new student can sign up and return after login; the seeded mentor can log in; missing, expired, tampered, and wrong-role tokens cannot access protected endpoints. A signup request cannot grant itself mentor privileges.
 

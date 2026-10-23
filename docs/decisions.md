@@ -32,11 +32,13 @@ Show pending, approved, rejected, and total counts across all submissions. Chang
 
 ## Session and spam protection
 
-Use a signed, expiring JWT in an HttpOnly, SameSite cookie, with Secure enabled in production. Validate the token's algorithm, issuer, audience, and expiry. Do not put tokens in browser local storage. Check request origin for cookie-authenticated mutations, and verify that cookie forwarding works through the Next.js proxy.
+Use a signed, expiring JWT (`jose`, HS256) in an HttpOnly, SameSite=Lax, host-only cookie with `Path=/`, and Secure enabled in production. Validate the algorithm, issuer, audience, subject, and expiry. Do not put tokens in JSON responses or browser local storage. Check the `Origin` header for signup, login, logout, and other cookie-authenticated mutations against `WEB_ORIGINS`. Do not derive trust from arbitrary `Host` or client-controlled forwarding headers.
 
-Start with a 30-minute session and login again on expiry. Logout clears the cookie; immediate revocation of copied tokens is outside the initial scope and will be documented.
+Passwords are never trimmed. They must be at least 8 characters and at most 72 UTF-8 bytes so bcrypt cannot silently truncate them. Public signup always creates `STUDENT` accounts; clients cannot set `role`.
 
-Proposed limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, and 5 submission attempts per 10 minutes per student. Include HTTP 429 and retry information. In-memory limits suit a single API process; a multi-instance deployment needs a shared store. Configure trusted proxy handling explicitly for the chosen deployment.
+Start with a 30-minute session and sign in again on expiry. Logout clears the browser cookie; a copied token remains valid until it expires. Immediate server-side revocation is outside this phase.
+
+Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, and (later) 5 submission attempts per 10 minutes per student. Include HTTP 429 and retry information. The in-memory limiter suits a single API process; multi-instance deployments need a shared store. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through the Next.js `/api` rewrite.
 
 ## Presentation
 

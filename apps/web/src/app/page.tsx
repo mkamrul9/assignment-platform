@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 
 const workflow = [
@@ -33,18 +34,7 @@ export default function HomePage() {
         Skip to content
       </a>
 
-      <header className="flex items-center justify-between gap-4 border-b py-7">
-        <Link href="/" aria-label="ReviewDock home" className="flex items-center gap-3">
-          <span
-            aria-hidden="true"
-            className="grid size-9 place-items-center rounded-lg bg-primary text-sm font-semibold text-white"
-          >
-            rd.
-          </span>
-          <span className="text-lg font-semibold tracking-tight">ReviewDock</span>
-        </Link>
-        <span className="text-xs text-muted-foreground sm:text-sm">Work, meet perspective.</span>
-      </header>
+      <SiteHeader />
 
       <main id="main" className="flex-1">
         <section className="max-w-3xl py-20 sm:py-28">
@@ -58,11 +48,14 @@ export default function HomePage() {
             A shared space for students to submit what they have built, and for mentors to help move
             it forward.
           </p>
-          <Button asChild className="mt-9" size="lg">
-            <a href="#workflow">
-              See how it works <span aria-hidden="true">↓</span>
-            </a>
-          </Button>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Button asChild size="lg">
+              <Link href="/signup">Create a student account</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/login">Sign in</Link>
+            </Button>
+          </div>
         </section>
 
         <section
@@ -80,7 +73,7 @@ export default function HomePage() {
         </section>
 
         <p className="mb-12 rounded-lg border bg-card px-5 py-4 text-sm leading-6 text-muted-foreground">
-          The workspace is getting ready. Submission and review tools will be available here soon.
+          Accounts are ready. Submission and review tools will be available here in later phases.
         </p>
       </main>
 
