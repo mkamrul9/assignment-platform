@@ -58,13 +58,13 @@ Commit: `feat: add project submissions with validation and duplicate protection`
 
 ## 5. Mentor reviews
 
-- [ ] Add mentor-only listing with validated page, page size, and status parameters.
-- [ ] Apply pagination and status filtering in PostgreSQL through Prisma.
-- [ ] Return aggregated pending, approved, rejected, and total counts.
-- [ ] Add approval and rejection endpoints, including reviewer and timestamp.
-- [ ] Require a short reason for rejection and guard against competing decisions.
-- [ ] Build the paginated shadcn/ui data table, filters, totals, and review dialog.
-- [ ] Refresh the queue and statistics after a successful decision.
+- [x] Add mentor-only listing with validated page, page size, and status parameters.
+- [x] Apply pagination and status filtering in PostgreSQL through Prisma.
+- [x] Return aggregated pending, approved, rejected, and total counts.
+- [x] Add approval and rejection endpoints, including reviewer and timestamp.
+- [x] Require a short reason for rejection and guard against competing decisions.
+- [x] Build the paginated shadcn/ui data table, filters, totals, and review dialog.
+- [x] Refresh the queue and statistics after a successful decision.
 
 Completion: filtering changes server results and pagination metadata. Counts reflect the full queue. Two mentors reviewing the same pending project cannot silently overwrite one another. Students cannot use review endpoints.
 

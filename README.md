@@ -6,7 +6,7 @@ Students will submit a repository, live link, and project description. Mentors w
 
 ## Current progress
 
-Phase 4: student project submissions. Authenticated students can submit a repository, live link, and description, then see their own projects and any review feedback. Mentor review actions are planned next.
+Phase 5: mentor review queue. Authenticated mentors can filter and paginate submissions, see global totals, and approve or reject pending projects with optional/required notes. Students see updated status and feedback on their own list.
 
 - [Roadmap and completion criteria](docs/roadmap.md)
 - [Architecture and planned structure](docs/architecture.md)
@@ -101,6 +101,7 @@ npm run db:reset         # Destructive: drop data, re-apply migrations (does not
 npm run db:check         # Isolated disposable-DB persistence checks
 npm run auth:check       # Isolated disposable-DB authentication checks
 npm run submissions:check # Isolated disposable-DB submission checks
+npm run reviews:check    # Isolated disposable-DB mentor review checks
 ```
 
 `npm run db:down` stops the container and keeps the named Docker volume. `npm run db:reset` is destructive for the database named in `DATABASE_URL`. After a reset, run `npm run db:seed` again if you need the mentor account.
@@ -122,6 +123,40 @@ Signup and login are rate-limited in memory (5 signups/hour/IP, 10 logins/15 min
 - `GET /api/submissions/mine` — that student's projects (`Cache-Control: no-store`)
 
 Create body: `projectName`, `repositoryUrl`, `liveUrl`, `description`. The API stores the submitted repository URL and a server-derived `canonicalRepositoryUrl` used for uniqueness. Equivalent GitHub URLs such as `https://github.com/Owner/Repo`, `https://github.com/owner/repo/`, and `https://github.com/OWNER/REPO.git?tab=readme#top` normalize to `https://github.com/owner/repo`. Non-GitHub hosts keep path case after host normalization. Duplicate canonical URLs return `409` without revealing another student's identity.
+
+### Mentor reviews
+
+- `GET /api/reviews/submissions` — mentor-only queue (`Cache-Control: no-store`)
+- `GET /api/reviews/stats` — mentor-only global counts (`Cache-Control: no-store`)
+- `POST /api/reviews/submissions/:id/decision` — mentor-only decision, trusted Origin required
+
+Query defaults: `page=1`, `pageSize=10` (max 50), `status=PENDING` (`ALL` | `PENDING` | `APPROVED` | `REJECTED`). Ordering is newest first (`createdAt` desc, `id` desc). Pagination metadata includes `total`, `totalPages`, `hasNextPage`, and `hasPreviousPage`. Out-of-range pages return no rows but keep the filtered totals. Stats always cover every submission: `{ pending, approved, rejected, total }`.
+
+Decision body: `{ decision: "APPROVED" | "REJECTED", note?: string }`. Rejection requires a trimmed note of 10–1,000 characters. Approval notes are optional (max 1,000; blank becomes `null`). Already-reviewed projects return `409`. Concurrent decisions leave exactly one review.
+
+Example queue response shape:
+
+```json
+{
+  "submissions": [
+    {
+      "id": "…",
+      "projectName": "Demo Project",
+      "status": "PENDING",
+      "owner": { "id": "…", "name": "Ada", "email": "ada@example.com" },
+      "review": null
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "total": 5,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  }
+}
+```
 
 Frontend routes: `/signup`, `/login`, `/student`, `/student/submit`, `/mentor`.
 
@@ -148,13 +183,15 @@ apps/
     src/app/            Routes, root layout, and styles
     src/components/     UI primitives and shared layout
     src/features/auth/  Session provider, forms, and guards
+    src/features/submissions/ Student submit form and project list
+    src/features/reviews/ Mentor queue, stats, and decision dialog
     src/lib/            Frontend utilities
   api/                  Express application
     prisma/             Schema, migrations, and mentor seed
     src/config/         Validated environment settings
     src/lib/            Prisma client, JWT, cookies, passwords
     src/middleware/     Auth, origin, rate limits, errors
-    src/modules/        Feature modules (health, auth, …)
+    src/modules/        Feature modules (health, auth, submissions, reviews)
     src/app.ts          Application wiring
     src/server.ts       Process startup and shutdown
     tests/              Database integration checks

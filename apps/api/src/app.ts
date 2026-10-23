@@ -6,6 +6,7 @@ import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
+import { createReviewsRouter } from "./modules/reviews/reviews.routes.js";
 import { createSubmissionsRouter } from "./modules/submissions/submissions.routes.js";
 import { roleBoundaryRouter } from "./modules/test/role-boundary.routes.js";
 
@@ -27,6 +28,7 @@ export function createApp() {
   app.use("/api/health", healthRouter);
   app.use("/api/auth", createAuthRouter());
   app.use("/api/submissions", createSubmissionsRouter());
+  app.use("/api/reviews", createReviewsRouter());
 
   if (env.NODE_ENV === "test") {
     app.use("/api/test", roleBoundaryRouter);

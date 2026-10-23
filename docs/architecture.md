@@ -6,7 +6,7 @@ Next.js owns presentation, navigation, and form interaction. Express owns valida
 
 The browser calls `/api/*` on the web origin. Next.js forwards those requests to Express using its server-only `API_INTERNAL_URL`. This keeps cookies on one browser origin and avoids requiring a public API hostname during development.
 
-Implemented so far: health, persistence, authentication, and student submissions (`POST /api/submissions`, `GET /api/submissions/mine`). Mentor review features remain planned.
+Implemented so far: health, persistence, authentication, student submissions, and mentor reviews (`GET /api/reviews/submissions`, `GET /api/reviews/stats`, `POST /api/reviews/submissions/:id/decision`).
 
 ## Structure
 
@@ -33,6 +33,7 @@ apps/
       features/
         auth/                     Session provider, forms, guards
         submissions/              Submit form and project list
+        reviews/                  Mentor queue, stats, and decision dialog
       lib/
         api.ts                    Relative /api fetch helper
         utils.ts
@@ -56,13 +57,14 @@ apps/
         health/
         auth/
         submissions/
-        reviews/                  Planned
+        reviews/                  Queue, stats, and atomic decisions
       app.ts
       server.ts
     tests/
       persistence.check.ts
       auth.check.ts
       submissions.check.ts
+      reviews.check.ts
 compose.yaml                      Local PostgreSQL with persistent volume
 docs/
 ```
@@ -77,11 +79,11 @@ Each API feature will keep its routes, input schemas, and business logic togethe
 - **Submission:** ID, owner ID, project name, repository URL, unique canonical repository URL, live link, description, status, creation and update times.
 - **Review:** ID, unique submission ID, mentor ID, decision, note, review time.
 
-A submission starts pending. Approval or rejection writes the review and changes the status in one transaction. The implementation must make that transition conditional on the current status still being pending. Database uniqueness supplies the final protection against concurrent duplicate submissions and competing reviews.
+A submission starts pending. Approval or rejection writes the review and changes the status in one transaction. The transition uses a conditional `updateMany` on `status = PENDING`, then creates the unique review row in the same transaction. Database uniqueness supplies the final protection against concurrent duplicate submissions and competing reviews.
 
 ## API outline
 
-Health, auth, and student submissions are implemented. Mentor review routes remain proposed:
+Health, auth, student submissions, and mentor reviews are implemented:
 
 ```text
 GET    /api/health
@@ -91,18 +93,24 @@ POST   /api/auth/logout
 GET    /api/auth/me
 POST   /api/submissions
 GET    /api/submissions/mine
-GET    /api/reviews/submissions?...          Planned
-GET    /api/reviews/stats                    Planned
-POST   /api/reviews/submissions/:id/decision Planned
+GET    /api/reviews/submissions?page&pageSize&status
+GET    /api/reviews/stats
+POST   /api/reviews/submissions/:id/decision
 ```
 
-The paginated response will contain rows and pagination metadata. Statistics cover the whole review queue, independent of the selected filter. Filter changes reset the UI to page 1, and list ordering uses creation time plus ID to make ties deterministic.
+`GET /api/reviews/submissions` is mentor-only. Defaults are `page=1`, `pageSize=10`, `status=PENDING`. `status` accepts `ALL`, `PENDING`, `APPROVED`, or `REJECTED`. Ordering is `createdAt` descending, then `id` descending. Filtering, counting, and pagination run in PostgreSQL. Out-of-range pages return an empty `submissions` array with stable pagination metadata for the requested page. Responses use explicit field selection and `Cache-Control: no-store`.
+
+`GET /api/reviews/stats` returns global `{ pending, approved, rejected, total }` counts independent of queue filters.
+
+`POST /api/reviews/submissions/:id/decision` requires a trusted Origin. Body: `{ decision: "APPROVED" | "REJECTED", note?: string }`. Rejection notes are required (10–1,000 characters after trim). Approval notes are optional (max 1,000; blank becomes `null`). Missing submissions return `404`; already-decided submissions return `409`. Reviewer identity and timestamp come from the server.
+
+The paginated response contains rows and pagination metadata. Statistics cover the whole review queue, independent of the selected filter. Filter changes reset the UI to page 1, and list ordering uses creation time plus ID to make ties deterministic.
 
 ## Verification strategy
 
-The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`. Phase 3 adds `npm run auth:check`. Phase 4 adds `npm run submissions:check` for validation, canonicalization, uniqueness races, ownership isolation, origin protection, and per-student rate limits, plus a browser journey through `/student/submit`.
+The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`. Phase 3 adds `npm run auth:check`. Phase 4 adds `npm run submissions:check`. Phase 5 adds `npm run reviews:check` for mentor authorization, query validation, server-side pagination/filters, global stats, approval/rejection rules, trusted-Origin protection, concurrent decision races, transaction rollback, and student visibility of decisions through `/mine`.
 
-Integration tests should use an isolated PostgreSQL database. Tests that replace Prisma with mocks cannot prove database constraints or transactions work. Browser tests will cover the connected student and mentor journeys once those screens exist.
+Integration tests should use an isolated PostgreSQL database. Tests that replace Prisma with mocks cannot prove database constraints or transactions work. Browser checks cover the connected student submit and mentor review journey on `/mentor`.
 
 The foundation uses ESLint 9 because the React, import, and accessibility plugins bundled by Next.js 16.4.2 declare support through that major version. npm currently emits a deprecation notice for ESLint 9. Move to ESLint 10 when those plugins support it; do not bypass their peer requirements.
 

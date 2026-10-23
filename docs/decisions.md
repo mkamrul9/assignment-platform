@@ -38,7 +38,7 @@ Passwords are never trimmed. They must be at least 8 characters and at most 72 U
 
 Start with a 30-minute session and sign in again on expiry. Logout clears the browser cookie; a copied token remains valid until it expires. Immediate server-side revocation is outside this phase.
 
-Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, and (later) 5 submission attempts per 10 minutes per student. Include HTTP 429 and retry information. The in-memory limiter suits a single API process; multi-instance deployments need a shared store. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through the Next.js `/api` rewrite.
+Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, and 5 submission attempts per 10 minutes per student. Include HTTP 429 and retry information. The in-memory limiter suits a single API process; multi-instance deployments need a shared store. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through the Next.js `/api` rewrite.
 
 ## Presentation
 
