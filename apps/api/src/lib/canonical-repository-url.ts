@@ -14,23 +14,20 @@
 export function canonicalizeRepositoryUrl(input: string): string {
   const url = new URL(input);
 
-  let host = url.hostname.toLowerCase();
-  if (host.startsWith("www.")) {
-    host = host.slice(4);
-  }
-
+  const host = url.hostname.toLowerCase();
   let pathname = url.pathname.replace(/\/+$/u, "");
   if (pathname.toLowerCase().endsWith(".git")) {
-    pathname = pathname.slice(0, -4);
+    pathname = pathname.slice(0, -4).replace(/\/+$/u, "");
   }
 
-  const segments = pathname.split("/").filter(Boolean);
-
-  if (host === "github.com" && segments.length >= 2) {
-    segments[0] = segments[0]!.toLowerCase();
-    segments[1] = segments[1]!.toLowerCase();
+  // Preserve internal separators, non-default ports, and non-GitHub hostnames.
+  // These may identify distinct repositories on self-hosted services.
+  if (host === "github.com") {
+    const segments = pathname.split("/");
+    if (segments[1]) segments[1] = segments[1].toLowerCase();
+    if (segments[2]) segments[2] = segments[2].toLowerCase();
+    pathname = segments.join("/");
   }
 
-  const normalizedPath = segments.length > 0 ? `/${segments.join("/")}` : "";
-  return `https://${host}${normalizedPath}`;
+  return `https://${url.host.toLowerCase()}${pathname}`;
 }

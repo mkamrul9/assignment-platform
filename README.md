@@ -118,6 +118,8 @@ npm run test:e2e:ui      # Same, with the Playwright UI
 
 `npm run db:down` stops the container and keeps the named Docker volume. `npm run db:reset` is destructive for the database named in `DATABASE_URL`. After a reset, run `npm run db:seed` again if you need the mentor account. Integration and e2e suites create disposable databases and clean them up; they do not wipe the development database.
 
+Browser tests use ports `3010` and `4010` by default (`E2E_WEB_PORT` / `E2E_API_PORT`). If a port is occupied, the suite exits without terminating its owner. `E2E_DATABASE_NAME` must be `reviewdock_e2e` or start with `reviewdock_e2e_`, and must differ from the database in `DATABASE_URL`. Setup failures also clean up the disposable database. Run commands that generate Prisma (`check` and `build`) sequentially against the same checkout.
+
 First Playwright run also needs browsers:
 
 ```sh

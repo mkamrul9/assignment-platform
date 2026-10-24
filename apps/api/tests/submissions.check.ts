@@ -177,6 +177,16 @@ async function main() {
     "https://github.com/owner/repo/",
     "https://github.com/OWNER/REPO.git?tab=readme#top",
   ];
+  for (const [input, expected] of [
+    ["https://git.example.com:8443/Org/Repo/", "https://git.example.com:8443/Org/Repo"],
+    ["https://www.git.example.com/Org/Repo", "https://www.git.example.com/Org/Repo"],
+    ["https://git.example.com/Org//Repo", "https://git.example.com/Org//Repo"],
+    ["https://github.com/Owner/Repo/.git", "https://github.com/owner/repo"],
+  ]) {
+    const normalized = canonicalizeRepositoryUrl(input!);
+    assert(normalized === expected, `meaningful URL components lost: ${input}`);
+    assert(canonicalizeRepositoryUrl(normalized) === normalized, `not idempotent: ${input}`);
+  }
   const canonical = examples.map(canonicalizeRepositoryUrl);
   assert(
     canonical.every((value) => value === "https://github.com/owner/repo"),

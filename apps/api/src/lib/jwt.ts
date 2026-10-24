@@ -23,6 +23,7 @@ export async function signSessionToken(userId: string): Promise<string> {
 export async function verifySessionToken(token: string): Promise<{ userId: string }> {
   const { payload } = await jwtVerify(token, secretKey(), {
     algorithms: [ALGORITHM],
+    requiredClaims: ["exp", "sub", "iss", "aud"],
     issuer: env.JWT_ISSUER,
     audience: env.JWT_AUDIENCE,
   });

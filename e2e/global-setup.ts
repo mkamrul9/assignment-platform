@@ -1,8 +1,9 @@
 import { config as loadDotenv } from "dotenv";
 import bcrypt from "bcryptjs";
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import net from "node:net";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { migrateDeploy, resetDatabase, seedMentor } from "./db";
@@ -37,31 +38,16 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function killPort(port: number) {
-  try {
-    if (process.platform === "win32") {
-      const output = execFileSync("cmd", ["/c", `netstat -ano | findstr :${port}`], {
-        encoding: "utf8",
-      });
-      const pids = new Set(
-        output
-          .split(/\r?\n/)
-          .map((line) => line.trim().split(/\s+/).pop())
-          .filter((value): value is string => Boolean(value) && /^\d+$/.test(value)),
-      );
-      for (const pid of pids) {
-        try {
-          execFileSync("taskkill", ["/pid", pid, "/T", "/F"], { stdio: "ignore" });
-        } catch {
-          // ignore
-        }
-      }
-      return;
-    }
-    execFileSync("sh", ["-c", `fuser -k ${port}/tcp || true`], { stdio: "ignore" });
-  } catch {
-    // nothing listening
-  }
+async function assertPortAvailable(port: number) {
+  await new Promise<void>((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once("error", () =>
+      reject(new Error(`E2E port ${port} is busy. Stop its owner or choose another E2E port.`)),
+    );
+    probe.listen(port, "127.0.0.1", () =>
+      probe.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
 }
 
 async function waitForUrl(url: string, timeoutMs: number) {
@@ -141,14 +127,10 @@ export default async function globalSetup() {
   fs.mkdirSync(RUNTIME_DIR, { recursive: true });
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 
+  await assertPortAvailable(E2E_API_PORT);
+  await assertPortAvailable(E2E_WEB_PORT);
+  fs.rmSync(path.join(RUNTIME_DIR, "state.json"), { force: true });
   const databaseUrl = await resetDatabase(DEV_DATABASE_URL, E2E_DATABASE_NAME);
-  migrateDeploy(databaseUrl);
-  seedMentor(databaseUrl, {
-    name: MENTOR_NAME,
-    email: MENTOR_EMAIL,
-    password: MENTOR_PASSWORD,
-  });
-  await seedFixtures(databaseUrl);
 
   const baseURL = `http://127.0.0.1:${E2E_WEB_PORT}`;
   const apiURL = `http://127.0.0.1:${E2E_API_PORT}`;
@@ -157,10 +139,14 @@ export default async function globalSetup() {
   let api: ChildProcess | undefined;
   let web: ChildProcess | undefined;
 
-  killPort(E2E_API_PORT);
-  killPort(E2E_WEB_PORT);
-
   try {
+    migrateDeploy(databaseUrl);
+    seedMentor(databaseUrl, {
+      name: MENTOR_NAME,
+      email: MENTOR_EMAIL,
+      password: MENTOR_PASSWORD,
+    });
+    await seedFixtures(databaseUrl);
     api = spawnLogged(process.execPath, ["dist/server.js"], {
       cwd: apiRoot,
       logName: "api",

@@ -41,6 +41,8 @@ export default async function globalTeardown() {
   try {
     await dropDatabase(DEV_DATABASE_URL, state.databaseName);
   } catch (error) {
-    console.error("Failed to drop e2e database:", error);
+    throw new Error("Failed to drop e2e database.", { cause: error });
+  } finally {
+    fs.rmSync(STATE_PATH, { force: true });
   }
 }

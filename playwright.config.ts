@@ -1,22 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import fs from "node:fs";
-import path from "node:path";
-
-import { E2E_WEB_PORT, STATE_PATH } from "./e2e/runtime";
-
-function resolveBaseURL() {
-  if (fs.existsSync(STATE_PATH)) {
-    try {
-      const state = JSON.parse(fs.readFileSync(STATE_PATH, "utf8")) as { baseURL?: string };
-      if (state.baseURL) {
-        return state.baseURL;
-      }
-    } catch {
-      // Fall through to default.
-    }
-  }
-  return `http://127.0.0.1:${E2E_WEB_PORT}`;
-}
+import { E2E_WEB_PORT } from "./e2e/runtime";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -32,7 +15,7 @@ export default defineConfig({
   globalTeardown: "./e2e/global-teardown.ts",
   outputDir: "test-results",
   use: {
-    baseURL: resolveBaseURL(),
+    baseURL: `http://127.0.0.1:${E2E_WEB_PORT}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

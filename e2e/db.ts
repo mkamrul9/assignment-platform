@@ -23,7 +23,17 @@ function quoteIdent(identifier: string): string {
   return `"${identifier}"`;
 }
 
+function assertDisposableDatabase(devUrl: string, databaseName: string): void {
+  if (!/^reviewdock_e2e(?:_[a-z0-9_]+)?$/i.test(databaseName)) {
+    throw new Error("E2E database names must start with reviewdock_e2e.");
+  }
+  if (new URL(devUrl).pathname.slice(1) === databaseName) {
+    throw new Error("Refusing to reset or drop the configured development database.");
+  }
+}
+
 export async function resetDatabase(devUrl: string, testDbName: string): Promise<string> {
+  assertDisposableDatabase(devUrl, testDbName);
   const client = new pg.Client({ connectionString: adminConnectionString(devUrl) });
   await client.connect();
   try {
@@ -40,6 +50,7 @@ export async function resetDatabase(devUrl: string, testDbName: string): Promise
 }
 
 export async function dropDatabase(devUrl: string, testDbName: string): Promise<void> {
+  assertDisposableDatabase(devUrl, testDbName);
   const client = new pg.Client({ connectionString: adminConnectionString(devUrl) });
   await client.connect();
   try {

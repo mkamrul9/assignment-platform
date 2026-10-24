@@ -352,6 +352,14 @@ async function main() {
       .sign(secret);
     assert((await cookieForToken(expired)).status === 401, "expired token must be 401");
 
+    const missingExpiry = await new SignJWT({})
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject(validUserId)
+      .setIssuer(JWT_ISSUER)
+      .setAudience(JWT_AUDIENCE)
+      .sign(secret);
+    assert((await cookieForToken(missingExpiry)).status === 401, "missing expiry must be 401");
+
     const wrongIssuer = await new SignJWT({})
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(validUserId)

@@ -138,14 +138,20 @@ export async function listReviewQueue(query: QueueQuery): Promise<{
 }
 
 export async function getReviewStats(): Promise<ReviewStats> {
-  const [pending, approved, rejected, total] = await Promise.all([
-    prisma.submission.count({ where: { status: SubmissionStatus.PENDING } }),
-    prisma.submission.count({ where: { status: SubmissionStatus.APPROVED } }),
-    prisma.submission.count({ where: { status: SubmissionStatus.REJECTED } }),
-    prisma.submission.count(),
-  ]);
-
-  return { pending, approved, rejected, total };
+  // A single aggregate query gives every card the same database snapshot.
+  const groups = await prisma.submission.groupBy({
+    by: ["status"],
+    _count: { _all: true },
+  });
+  const stats: ReviewStats = { pending: 0, approved: 0, rejected: 0, total: 0 };
+  for (const group of groups) {
+    const count = group._count._all;
+    stats.total += count;
+    if (group.status === SubmissionStatus.PENDING) stats.pending = count;
+    if (group.status === SubmissionStatus.APPROVED) stats.approved = count;
+    if (group.status === SubmissionStatus.REJECTED) stats.rejected = count;
+  }
+  return stats;
 }
 
 export async function decideSubmission(
