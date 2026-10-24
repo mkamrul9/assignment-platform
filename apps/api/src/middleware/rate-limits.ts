@@ -39,11 +39,20 @@ function createLimiter(options: {
   });
 }
 
+function positiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /** 10 login attempts per 15 minutes per IP. In-memory; single process only. */
 export function createLoginRateLimit() {
   return createLimiter({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: positiveIntEnv("LOGIN_RATE_LIMIT_MAX", 10),
     code: "LOGIN_RATE_LIMITED",
     message: "Too many login attempts. Please try again later.",
     keyGenerator: (req) => ipKeyGenerator(clientIp(req)),
@@ -54,7 +63,7 @@ export function createLoginRateLimit() {
 export function createSignupRateLimit() {
   return createLimiter({
     windowMs: 60 * 60 * 1000,
-    max: 5,
+    max: positiveIntEnv("SIGNUP_RATE_LIMIT_MAX", 5),
     code: "SIGNUP_RATE_LIMITED",
     message: "Too many signup attempts. Please try again later.",
     keyGenerator: (req) => ipKeyGenerator(clientIp(req)),

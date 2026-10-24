@@ -175,6 +175,9 @@ export default async function globalSetup() {
         WEB_ORIGINS: webOrigins,
         TRUST_PROXY: "1",
         SESSION_COOKIE_NAME: "reviewdock_session",
+        // Shared Next→Express peer IP; raise signup so the full suite can create accounts.
+        // Keep the default login limit so proxy-trust can still observe shared IP buckets.
+        SIGNUP_RATE_LIMIT_MAX: "100",
       },
     });
 

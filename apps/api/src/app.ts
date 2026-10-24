@@ -15,8 +15,10 @@ export function createApp() {
 
   app.disable("x-powered-by");
   if (env.TRUST_PROXY) {
-    // Trust a single reverse-proxy hop (for example Next.js rewrites on localhost).
-    // Do not derive trust from arbitrary Host values.
+    // Trust a single reverse-proxy hop (Next.js /api proxy). The public Next route
+    // strips caller X-Forwarded-For unless TRUST_INGRESS_CLIENT_IP=1 on the web app
+    // and a trusted ingress has already replaced XFF with the verified peer IP.
+    // See Express "behind proxies" guidance: hop count must match topology.
     app.set("trust proxy", 1);
   }
 

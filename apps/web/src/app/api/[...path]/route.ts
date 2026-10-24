@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { buildUpstreamHeaders } from "@/lib/api-proxy-headers";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -25,22 +27,7 @@ async function proxyRequest(request: NextRequest, path: string[]) {
   const targetPath = path.map(encodeURIComponent).join("/");
   const target = `${API_INTERNAL_URL}/api/${targetPath}${request.nextUrl.search}`;
 
-  const headers = new Headers();
-  for (const [name, value] of request.headers.entries()) {
-    if (HOP_BY_HOP.has(name.toLowerCase())) {
-      continue;
-    }
-    headers.set(name, value);
-  }
-
-  // Cookie-authenticated mutations require the browser Origin, not the private API origin.
-  const browserOrigin = request.headers.get("origin") ?? request.nextUrl.origin;
-  headers.set("origin", browserOrigin);
-  headers.set("x-forwarded-host", request.headers.get("host") ?? request.nextUrl.host);
-  headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
-  if (!headers.has("x-forwarded-for")) {
-    headers.set("x-forwarded-for", "127.0.0.1");
-  }
+  const headers = buildUpstreamHeaders(request);
 
   const init: RequestInit = {
     method: request.method,
