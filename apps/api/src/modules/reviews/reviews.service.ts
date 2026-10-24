@@ -1,4 +1,9 @@
-import { Prisma, ReviewDecision, SubmissionStatus } from "../../generated/prisma/client.js";
+import {
+  CheckpointAssessment,
+  Prisma,
+  ReviewDecision,
+  SubmissionStatus,
+} from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 import type { DecisionInput, QueueQuery } from "./reviews.schemas.js";
 
@@ -23,6 +28,9 @@ export const queueSubmissionSelect = {
     select: {
       decision: true,
       note: true,
+      functionality: true,
+      usability: true,
+      documentation: true,
       reviewedAt: true,
       mentor: {
         select: {
@@ -75,11 +83,31 @@ function statusFilter(status: QueueQuery["status"]): Prisma.SubmissionWhereInput
   return { status: status as SubmissionStatus };
 }
 
+function searchFilter(q: string | undefined): Prisma.SubmissionWhereInput {
+  if (!q) {
+    return {};
+  }
+  return {
+    OR: [
+      { projectName: { contains: q, mode: "insensitive" } },
+      { repositoryUrl: { contains: q, mode: "insensitive" } },
+      { owner: { name: { contains: q, mode: "insensitive" } } },
+      { owner: { email: { contains: q, mode: "insensitive" } } },
+    ],
+  };
+}
+
+function queueWhere(query: QueueQuery): Prisma.SubmissionWhereInput {
+  return {
+    AND: [statusFilter(query.status), searchFilter(query.q)],
+  };
+}
+
 export async function listReviewQueue(query: QueueQuery): Promise<{
   submissions: QueueSubmission[];
   pagination: PaginationMeta;
 }> {
-  const where = statusFilter(query.status);
+  const where = queueWhere(query);
   const total = await prisma.submission.count({ where });
   const totalPages = total === 0 ? 0 : Math.ceil(total / query.pageSize);
   const skip = (query.page - 1) * query.pageSize;
@@ -154,6 +182,9 @@ export async function decideSubmission(
           mentorId,
           decision: input.decision,
           note: input.note,
+          functionality: input.checkpoints.functionality as CheckpointAssessment,
+          usability: input.checkpoints.usability as CheckpointAssessment,
+          documentation: input.checkpoints.documentation as CheckpointAssessment,
         },
       });
 

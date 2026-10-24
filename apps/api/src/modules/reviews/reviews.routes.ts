@@ -26,7 +26,7 @@ function rejectRepeatedQuery(
   query: Record<string, unknown>,
 ): { ok: true } | { ok: false; details: Array<{ path: string; message: string }> } {
   const details: Array<{ path: string; message: string }> = [];
-  for (const key of ["page", "pageSize", "status"] as const) {
+  for (const key of ["page", "pageSize", "status", "q"] as const) {
     if (Array.isArray(query[key])) {
       details.push({ path: key, message: `${key} must not be repeated.` });
     }

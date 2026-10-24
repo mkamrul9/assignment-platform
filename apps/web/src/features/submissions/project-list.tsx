@@ -6,6 +6,8 @@ import { useCallback, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiError, apiFetch } from "@/lib/api";
 
+import { checkpointLabel, CHECKPOINT_FIELDS } from "@/features/reviews/checkpoint-labels";
+
 import type { Submission } from "./types";
 
 type ListState =
@@ -187,8 +189,18 @@ export function ProjectList() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {formatDate(submission.review.reviewedAt)}
               </p>
+              <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+                {CHECKPOINT_FIELDS.map((field) => (
+                  <div key={field.key}>
+                    <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                      {field.label}
+                    </dt>
+                    <dd className="mt-1">{checkpointLabel(submission.review![field.key])}</dd>
+                  </div>
+                ))}
+              </dl>
               {submission.review.note ? (
-                <p className="mt-2 whitespace-pre-wrap leading-6 text-muted-foreground">
+                <p className="mt-3 whitespace-pre-wrap leading-6 text-muted-foreground">
                   {submission.review.note}
                 </p>
               ) : null}

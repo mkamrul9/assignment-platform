@@ -2,9 +2,20 @@ export type SubmissionStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type ReviewDecision = "APPROVED" | "REJECTED";
 export type QueueStatusFilter = "ALL" | SubmissionStatus;
 
+export type CheckpointAssessment = "MEETS_EXPECTATIONS" | "NEEDS_IMPROVEMENT" | "NOT_ASSESSED";
+
+export type ReviewCheckpoints = {
+  functionality: CheckpointAssessment;
+  usability: CheckpointAssessment;
+  documentation: CheckpointAssessment;
+};
+
 export type QueueReview = {
   decision: ReviewDecision;
   note: string | null;
+  functionality: CheckpointAssessment;
+  usability: CheckpointAssessment;
+  documentation: CheckpointAssessment;
   reviewedAt: string;
   mentor: {
     id: string;

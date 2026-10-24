@@ -1,8 +1,17 @@
 import { z } from "zod";
 
-import { ReviewDecision } from "../../generated/prisma/client.js";
+import { CheckpointAssessment, ReviewDecision } from "../../generated/prisma/client.js";
 
 const QUEUE_STATUSES = ["ALL", "PENDING", "APPROVED", "REJECTED"] as const;
+
+/** Maximum length for mentor queue search `q` after trim. */
+export const QUEUE_SEARCH_MAX_LENGTH = 100;
+
+const checkpointValue = z.enum([
+  CheckpointAssessment.MEETS_EXPECTATIONS,
+  CheckpointAssessment.NEEDS_IMPROVEMENT,
+  CheckpointAssessment.NOT_ASSESSED,
+]);
 
 const positiveInt = (label: string, max?: number) =>
   z.coerce
@@ -21,13 +30,36 @@ export const queueQuerySchema = z
     page: positiveInt("page").default(1),
     pageSize: positiveInt("pageSize", 50).default(10),
     status: z.enum(QUEUE_STATUSES).default("PENDING"),
+    q: z
+      .string()
+      .optional()
+      .transform((value) => {
+        if (value === undefined) {
+          return undefined;
+        }
+        const trimmed = value.trim();
+        return trimmed.length === 0 ? undefined : trimmed;
+      })
+      .refine((value) => value === undefined || value.length <= QUEUE_SEARCH_MAX_LENGTH, {
+        message: `q must be at most ${QUEUE_SEARCH_MAX_LENGTH} characters.`,
+      }),
   })
   .strict();
+
+const checkpointsSchema = z
+  .object({
+    functionality: checkpointValue.optional(),
+    usability: checkpointValue.optional(),
+    documentation: checkpointValue.optional(),
+  })
+  .strict()
+  .optional();
 
 export const decisionBodySchema = z
   .object({
     decision: z.enum([ReviewDecision.APPROVED, ReviewDecision.REJECTED]),
     note: z.string().optional(),
+    checkpoints: checkpointsSchema,
   })
   .strict()
   .superRefine((value, ctx) => {
@@ -61,9 +93,15 @@ export const decisionBodySchema = z
   })
   .transform((value) => {
     const trimmed = value.note?.trim() ?? "";
+    const checkpoints = value.checkpoints;
     return {
       decision: value.decision,
       note: trimmed.length === 0 ? null : trimmed,
+      checkpoints: {
+        functionality: checkpoints?.functionality ?? CheckpointAssessment.NOT_ASSESSED,
+        usability: checkpoints?.usability ?? CheckpointAssessment.NOT_ASSESSED,
+        documentation: checkpoints?.documentation ?? CheckpointAssessment.NOT_ASSESSED,
+      },
     };
   });
 

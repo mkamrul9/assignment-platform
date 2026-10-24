@@ -1,15 +1,33 @@
 "use client";
 
-import { FormEvent, useCallback, useId, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
 
+import {
+  CHECKPOINT_FIELDS,
+  CHECKPOINT_OPTIONS,
+  checkpointLabel,
+  type CheckpointFieldKey,
+} from "./checkpoint-labels";
 import type {
+  CheckpointAssessment,
   PaginationMeta,
   QueueStatusFilter,
   QueueSubmission,
+  ReviewCheckpoints,
   ReviewDecision,
   ReviewStats,
 } from "./types";
@@ -36,6 +54,15 @@ type StoreState = {
 };
 
 const emptyStats: ReviewStats = { pending: 0, approved: 0, rejected: 0, total: 0 };
+const SEARCH_MAX = 100;
+const SEARCH_DEBOUNCE_MS = 350;
+const PAGE_SIZES = [10, 20, 50] as const;
+
+const DEFAULT_CHECKPOINTS: ReviewCheckpoints = {
+  functionality: "NOT_ASSESSED",
+  usability: "NOT_ASSESSED",
+  documentation: "NOT_ASSESSED",
+};
 
 let store: StoreState = {
   stats: { status: "loading", stats: emptyStats, errorMessage: null },
@@ -88,8 +115,48 @@ function write(next: StoreState) {
   emit();
 }
 
-function queryKeyOf(page: number, pageSize: number, status: QueueStatusFilter) {
-  return `${status}|${page}|${pageSize}`;
+function queryKeyOf(page: number, pageSize: number, status: QueueStatusFilter, q: string) {
+  return `${status}|${page}|${pageSize}|${q}`;
+}
+
+function parseStatus(value: string | null): QueueStatusFilter {
+  if (value === "ALL" || value === "PENDING" || value === "APPROVED" || value === "REJECTED") {
+    return value;
+  }
+  return "PENDING";
+}
+
+function parsePage(value: string | null): number {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 ? n : 1;
+}
+
+function parsePageSize(value: string | null): number {
+  const n = Number(value);
+  return PAGE_SIZES.includes(n as (typeof PAGE_SIZES)[number]) ? n : 10;
+}
+
+function parseSearch(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+  return value.trim().slice(0, SEARCH_MAX);
+}
+
+function buildQueueSearchParams(input: {
+  page: number;
+  pageSize: number;
+  status: QueueStatusFilter;
+  q: string;
+}): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("page", String(input.page));
+  params.set("pageSize", String(input.pageSize));
+  params.set("status", input.status);
+  if (input.q) {
+    params.set("q", input.q);
+  }
+  return params;
 }
 
 async function fetchStats(): Promise<void> {
@@ -122,8 +189,9 @@ async function fetchQueue(
   page: number,
   pageSize: number,
   status: QueueStatusFilter,
+  q: string,
 ): Promise<void> {
-  const key = queryKeyOf(page, pageSize, status);
+  const key = queryKeyOf(page, pageSize, status, q);
   const seq = ++queueRequestSeq;
   write({
     ...store,
@@ -137,11 +205,7 @@ async function fetchQueue(
   });
 
   try {
-    const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(pageSize),
-      status,
-    });
+    const params = buildQueueSearchParams({ page, pageSize, status, q });
     const data = await apiFetch<{
       submissions: QueueSubmission[];
       pagination: PaginationMeta;
@@ -159,11 +223,7 @@ async function fetchQueue(
 
     if (rows.length === 0 && meta.total > 0 && meta.totalPages > 0 && page > meta.totalPages) {
       pageUsed = meta.totalPages;
-      const retryParams = new URLSearchParams({
-        page: String(pageUsed),
-        pageSize: String(pageSize),
-        status,
-      });
+      const retryParams = buildQueueSearchParams({ page: pageUsed, pageSize, status, q });
       const retry = await apiFetch<{
         submissions: QueueSubmission[];
         pagination: PaginationMeta;
@@ -185,7 +245,7 @@ async function fetchQueue(
         submissions: rows,
         pagination: meta,
         errorMessage: null,
-        queryKey: queryKeyOf(pageUsed, pageSize, status),
+        queryKey: queryKeyOf(pageUsed, pageSize, status, q),
       },
     });
   } catch (error) {
@@ -215,13 +275,18 @@ function ensureStats(): Promise<void> {
   return statsPromise;
 }
 
-function ensureQueue(page: number, pageSize: number, status: QueueStatusFilter): Promise<void> {
+function ensureQueue(
+  page: number,
+  pageSize: number,
+  status: QueueStatusFilter,
+  q: string,
+): Promise<void> {
   if (typeof window === "undefined") {
     return Promise.resolve();
   }
-  const key = queryKeyOf(page, pageSize, status);
+  const key = queryKeyOf(page, pageSize, status, q);
   if (!queuePromise || store.queue.queryKey !== key) {
-    queuePromise = fetchQueue(page, pageSize, status);
+    queuePromise = fetchQueue(page, pageSize, status, q);
   }
   return queuePromise;
 }
@@ -231,8 +296,13 @@ function requestStats(): Promise<void> {
   return statsPromise;
 }
 
-function requestQueue(page: number, pageSize: number, status: QueueStatusFilter): Promise<void> {
-  queuePromise = fetchQueue(page, pageSize, status);
+function requestQueue(
+  page: number,
+  pageSize: number,
+  status: QueueStatusFilter,
+  q: string,
+): Promise<void> {
+  queuePromise = fetchQueue(page, pageSize, status, q);
   return queuePromise;
 }
 
@@ -264,20 +334,35 @@ const FILTERS: Array<{ value: QueueStatusFilter; label: string }> = [
 ];
 
 export function MentorQueue() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noteFieldId = useId();
+  const searchFieldId = useId();
   const dialogTitleId = useId();
+  const checkpointsHintId = useId();
 
-  const [filter, setFilter] = useState<QueueStatusFilter>("PENDING");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const filter = parseStatus(searchParams.get("status"));
+  const page = parsePage(searchParams.get("page"));
+  const pageSize = parsePageSize(searchParams.get("pageSize"));
+  const q = parseSearch(searchParams.get("q"));
+
+  const [searchInput, setSearchInput] = useState(q);
+  const [searchInputUrl, setSearchInputUrl] = useState(q);
+  if (q !== searchInputUrl) {
+    setSearchInputUrl(q);
+    setSearchInput(q);
+  }
 
   const state = useSyncExternalStore(
     subscribe,
     () => {
       void ensureStats();
-      void ensureQueue(page, pageSize, filter);
+      void ensureQueue(page, pageSize, filter, q);
       return getSnapshot();
     },
     getServerSnapshot,
@@ -285,22 +370,41 @@ export function MentorQueue() {
 
   const [selected, setSelected] = useState<QueueSubmission | null>(null);
   const [note, setNote] = useState("");
+  const [checkpoints, setCheckpoints] = useState<ReviewCheckpoints>(DEFAULT_CHECKPOINTS);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const replaceQueueUrl = useCallback(
+    (next: { page: number; pageSize: number; status: QueueStatusFilter; q: string }) => {
+      const params = buildQueueSearchParams(next);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router],
+  );
+
   const reloadStats = useCallback(() => requestStats(), []);
 
   const reloadQueue = useCallback(
-    () => requestQueue(page, pageSize, filter),
-    [page, pageSize, filter],
+    () => requestQueue(page, pageSize, filter, q),
+    [page, pageSize, filter, q],
   );
 
   function openDialog(submission: QueueSubmission, trigger?: HTMLElement | null) {
     triggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
     setSelected(submission);
     setNote(submission.review?.note ?? "");
+    setCheckpoints(
+      submission.review
+        ? {
+            functionality: submission.review.functionality,
+            usability: submission.review.usability,
+            documentation: submission.review.documentation,
+          }
+        : { ...DEFAULT_CHECKPOINTS },
+    );
     setNoteError(null);
     setFormError(null);
     setSuccessMessage(null);
@@ -325,31 +429,63 @@ export function MentorQueue() {
   }
 
   function changeFilter(next: QueueStatusFilter) {
-    setFilter(next);
-    setPage(1);
-    void requestQueue(1, pageSize, next);
+    replaceQueueUrl({ page: 1, pageSize, status: next, q });
+    void requestQueue(1, pageSize, next, q);
   }
 
   function changePageSize(next: number) {
-    setPageSize(next);
-    setPage(1);
-    void requestQueue(1, next, filter);
+    replaceQueueUrl({ page: 1, pageSize: next, status: filter, q });
+    void requestQueue(1, next, filter, q);
   }
 
   function goToPage(next: number) {
-    setPage(next);
-    void requestQueue(next, pageSize, filter);
+    replaceQueueUrl({ page: next, pageSize, status: filter, q });
+    void requestQueue(next, pageSize, filter, q);
+  }
+
+  function applySearch(nextRaw: string) {
+    const next = nextRaw.trim().slice(0, SEARCH_MAX);
+    replaceQueueUrl({ page: 1, pageSize, status: filter, q: next });
+    void requestQueue(1, pageSize, filter, next);
+  }
+
+  function onSearchChange(value: string) {
+    const clipped = value.slice(0, SEARCH_MAX);
+    setSearchInput(clipped);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      applySearch(clipped);
+    }, SEARCH_DEBOUNCE_MS);
+  }
+
+  function clearSearch() {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    setSearchInput("");
+    applySearch("");
+  }
+
+  function setCheckpoint(key: CheckpointFieldKey, value: CheckpointAssessment) {
+    setCheckpoints((prev) => ({ ...prev, [key]: value }));
   }
 
   async function refreshAfterDecision(updated: QueueSubmission) {
     setSelected(updated);
+    setCheckpoints({
+      functionality: updated.review?.functionality ?? "NOT_ASSESSED",
+      usability: updated.review?.usability ?? "NOT_ASSESSED",
+      documentation: updated.review?.documentation ?? "NOT_ASSESSED",
+    });
     setSuccessMessage(
       updated.status === "APPROVED" ? "Project approved." : "Project rejected with feedback.",
     );
-    await Promise.all([requestStats(), requestQueue(page, pageSize, filter)]);
+    await Promise.all([requestStats(), requestQueue(page, pageSize, filter, q)]);
     const recovered = store.queue.pagination?.page;
     if (recovered && recovered !== page) {
-      setPage(recovered);
+      replaceQueueUrl({ page: recovered, pageSize, status: filter, q });
     }
   }
 
@@ -379,6 +515,7 @@ export function MentorQueue() {
           body: JSON.stringify({
             decision,
             note: note.trim().length === 0 ? undefined : note,
+            checkpoints,
           }),
         },
       );
@@ -388,11 +525,7 @@ export function MentorQueue() {
         if (error.status === 409) {
           setFormError(error.message);
           try {
-            const params = new URLSearchParams({
-              page: String(page),
-              pageSize: String(pageSize),
-              status: filter,
-            });
+            const params = buildQueueSearchParams({ page, pageSize, status: filter, q });
             const [queue, statsData] = await Promise.all([
               apiFetch<{ submissions: QueueSubmission[]; pagination: PaginationMeta }>(
                 `/api/reviews/submissions?${params.toString()}`,
@@ -410,13 +543,20 @@ export function MentorQueue() {
                 submissions: queue.submissions,
                 pagination: queue.pagination,
                 errorMessage: null,
-                queryKey: queryKeyOf(page, pageSize, filter),
+                queryKey: queryKeyOf(page, pageSize, filter, q),
               },
             });
             const fresh = queue.submissions.find((item) => item.id === selected.id) ?? null;
             if (fresh) {
               setSelected(fresh);
               setNote(fresh.review?.note ?? note);
+              if (fresh.review) {
+                setCheckpoints({
+                  functionality: fresh.review.functionality,
+                  usability: fresh.review.usability,
+                  documentation: fresh.review.documentation,
+                });
+              }
             }
           } catch {
             setFormError(`${error.message} Refresh the queue to see the saved decision.`);
@@ -441,6 +581,14 @@ export function MentorQueue() {
   function onDialogSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
   }
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
 
   const { stats, queue } = state;
 
@@ -486,7 +634,7 @@ export function MentorQueue() {
           <div>
             <h2 className="text-sm font-semibold tracking-tight">Review queue</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Server-filtered and paginated. Totals above stay global.
+              Find projects by name, student, or repository. Totals above stay global.
             </p>
           </div>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Status filter">
@@ -505,20 +653,46 @@ export function MentorQueue() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Label htmlFor="pageSize">Rows</Label>
-          <select
-            id="pageSize"
-            className="h-9 rounded-md border border-input bg-card px-3 text-sm"
-            value={pageSize}
-            onChange={(event) => changePageSize(Number(event.target.value))}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[min(100%,18rem)] flex-1 space-y-2">
+            <Label htmlFor={searchFieldId}>Search projects</Label>
+            <Input
+              id={searchFieldId}
+              type="search"
+              value={searchInput}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Project, student, or repository"
+              maxLength={SEARCH_MAX}
+              aria-describedby={`${searchFieldId}-hint`}
+            />
+            <p id={`${searchFieldId}-hint`} className="text-xs text-muted-foreground">
+              Up to {SEARCH_MAX} characters. Results update as you type.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearSearch}
+            disabled={!searchInput && !q}
           >
-            {[10, 20, 50].map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+            Clear search
+          </Button>
+          <div className="space-y-2">
+            <Label htmlFor="pageSize">Rows</Label>
+            <select
+              id="pageSize"
+              className="h-9 rounded-md border border-input bg-card px-3 text-sm"
+              value={pageSize}
+              onChange={(event) => changePageSize(Number(event.target.value))}
+            >
+              {PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {queue.status === "loading" ? (
@@ -538,7 +712,7 @@ export function MentorQueue() {
 
         {queue.status === "ready" && queue.submissions.length === 0 ? (
           <div className="rounded-lg border bg-card px-5 py-6 text-sm text-muted-foreground">
-            No projects match this filter.
+            {q ? "No projects match this search and filter." : "No projects match this filter."}
           </div>
         ) : null}
 
@@ -706,8 +880,18 @@ export function MentorQueue() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatDate(selected.review.reviewedAt)}
                 </p>
+                <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {CHECKPOINT_FIELDS.map((field) => (
+                    <div key={field.key}>
+                      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                        {field.label}
+                      </dt>
+                      <dd className="mt-1">{checkpointLabel(selected.review![field.key])}</dd>
+                    </div>
+                  ))}
+                </dl>
                 {selected.review.note ? (
-                  <p className="mt-2 whitespace-pre-wrap leading-6 text-muted-foreground">
+                  <p className="mt-3 whitespace-pre-wrap leading-6 text-muted-foreground">
                     {selected.review.note}
                   </p>
                 ) : null}
@@ -715,7 +899,36 @@ export function MentorQueue() {
             ) : null}
 
             {selected.status === "PENDING" ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-medium">Checkpoints</legend>
+                  <p id={checkpointsHintId} className="text-xs text-muted-foreground">
+                    Optional checkpoints give students more specific feedback. Your approve or
+                    reject decision remains the overall outcome.
+                  </p>
+                  {CHECKPOINT_FIELDS.map((field) => (
+                    <div key={field.key} className="space-y-2">
+                      <Label htmlFor={`${field.key}-checkpoint`}>{field.label}</Label>
+                      <select
+                        id={`${field.key}-checkpoint`}
+                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={checkpoints[field.key]}
+                        disabled={saving}
+                        aria-describedby={checkpointsHintId}
+                        onChange={(event) =>
+                          setCheckpoint(field.key, event.target.value as CheckpointAssessment)
+                        }
+                      >
+                        {CHECKPOINT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </fieldset>
+
                 <div className="space-y-2">
                   <Label htmlFor={noteFieldId}>Review note</Label>
                   <textarea
@@ -729,7 +942,8 @@ export function MentorQueue() {
                     className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive"
                   />
                   <p id={`${noteFieldId}-hint`} className="text-xs text-muted-foreground">
-                    Optional for approval. Required for rejection (10–1,000 characters).
+                    Optional for approval. Required for rejection (10–1,000 characters). Use this
+                    for actionable improvement guidance.
                   </p>
                   {noteError ? (
                     <p id={`${noteFieldId}-error`} className="text-sm text-destructive">

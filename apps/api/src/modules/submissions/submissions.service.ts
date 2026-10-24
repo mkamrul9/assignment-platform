@@ -21,6 +21,9 @@ export const submissionSelect = {
     select: {
       decision: true,
       note: true,
+      functionality: true,
+      usability: true,
+      documentation: true,
       reviewedAt: true,
     },
   },
@@ -39,6 +42,9 @@ export type SubmissionView = {
   review: {
     decision: ReviewDecision;
     note: string | null;
+    functionality: string;
+    usability: string;
+    documentation: string;
     reviewedAt: Date;
   } | null;
 };
