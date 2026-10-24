@@ -11,6 +11,7 @@ import {
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { invalidateProjectListCache } from "@/features/submissions/project-list";
+import { resetDraftControllerForAccountChange } from "@/features/submissions/submission-draft";
 
 import type { AuthUser } from "./types";
 
@@ -103,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setUser = useCallback((next: AuthUser | null) => {
     invalidateProjectListCache();
+    resetDraftControllerForAccountChange();
     writeSession({
       status: next ? "authenticated" : "anonymous",
       user: next,
@@ -116,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Still clear local session state if the cookie is already gone.
     }
     invalidateProjectListCache();
+    resetDraftControllerForAccountChange();
     writeSession({ status: "anonymous", user: null });
   }, []);
 

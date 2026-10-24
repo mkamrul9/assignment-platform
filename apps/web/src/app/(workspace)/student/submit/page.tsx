@@ -13,8 +13,8 @@ export default function StudentSubmitPage() {
           </p>
           <h1 className="mt-4 font-serif text-4xl tracking-tight">Share your project</h1>
           <p className="mt-3 text-base leading-7 text-muted-foreground">
-            Provide the repository, a live demo, and a short description. Mentors review pending
-            projects in a later phase.
+            Provide the repository, a live demo, and a short description. A draft is saved on this
+            device while you work; mentors will see the project once you submit.
           </p>
           <div className="mt-8 rounded-xl border bg-card px-6 py-8 shadow-xs sm:px-8">
             <SubmissionForm />

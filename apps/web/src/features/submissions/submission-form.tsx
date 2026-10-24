@@ -2,14 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/features/auth/auth-context";
 import { ApiError, apiFetch } from "@/lib/api";
 
 import { invalidateProjectListCache } from "./project-list";
+import {
+  cancelPendingDraftWrite,
+  clearSubmissionDraft,
+  loadSubmissionDraft,
+  scheduleDraftSave,
+} from "./submission-draft";
 import type { Submission } from "./types";
 
 type FieldKey = "projectName" | "repositoryUrl" | "liveUrl" | "description" | "form";
@@ -60,8 +67,19 @@ function clientValidate(values: {
   return errors;
 }
 
+function formatDraftTime(iso: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(iso));
+}
+
 export function SubmissionForm() {
   const router = useRouter();
+  const { user, status } = useAuth();
+  const draftStatusId = useId();
+  const hydratedForUser = useRef<string | null>(null);
+
   const [projectName, setProjectName] = useState("");
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [liveUrl, setLiveUrl] = useState("");
@@ -69,6 +87,56 @@ export function SubmissionForm() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [successName, setSuccessName] = useState<string | null>(null);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !user || user.role !== "STUDENT") {
+      return;
+    }
+    if (hydratedForUser.current === user.id) {
+      return;
+    }
+    hydratedForUser.current = user.id;
+    const loaded = loadSubmissionDraft(user.id);
+    setProjectName(loaded.fields.projectName);
+    setRepositoryUrl(loaded.fields.repositoryUrl);
+    setLiveUrl(loaded.fields.liveUrl);
+    setDescription(loaded.fields.description);
+    setDraftSavedAt(loaded.savedAt);
+    setDraftRestored(Boolean(loaded.savedAt));
+  }, [status, user]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !user || user.role !== "STUDENT") {
+      return;
+    }
+    if (hydratedForUser.current !== user.id) {
+      return;
+    }
+    scheduleDraftSave(user.id, { projectName, repositoryUrl, liveUrl, description }, (savedAt) => {
+      setDraftSavedAt(savedAt);
+      if (savedAt) {
+        setDraftRestored(false);
+      }
+    });
+  }, [projectName, repositoryUrl, liveUrl, description, status, user]);
+
+  function discardDraft() {
+    if (!user) {
+      return;
+    }
+    cancelPendingDraftWrite();
+    clearSubmissionDraft(user.id);
+    setProjectName("");
+    setRepositoryUrl("");
+    setLiveUrl("");
+    setDescription("");
+    setDraftSavedAt(null);
+    setDraftRestored(false);
+    setErrors({});
+    setSuccessName(null);
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,6 +156,12 @@ export function SubmissionForm() {
         method: "POST",
         body: JSON.stringify({ projectName, repositoryUrl, liveUrl, description }),
       });
+      if (user) {
+        cancelPendingDraftWrite();
+        clearSubmissionDraft(user.id);
+      }
+      setDraftSavedAt(null);
+      setDraftRestored(false);
       setSuccessName(data.submission.projectName);
       setProjectName("");
       setRepositoryUrl("");
@@ -96,6 +170,7 @@ export function SubmissionForm() {
       invalidateProjectListCache();
       router.refresh();
     } catch (error) {
+      // Keep the draft after validation, duplicate, rate-limit, or network errors.
       if (error instanceof ApiError) {
         const nextErrors: FieldErrors = {};
         for (const detail of error.details ?? []) {
@@ -121,6 +196,25 @@ export function SubmissionForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-secondary/40 px-3 py-2 text-sm"
+        aria-live="polite"
+        id={draftStatusId}
+      >
+        <p className="text-muted-foreground">
+          {draftRestored && draftSavedAt
+            ? `Restored a draft saved on this device (${formatDraftTime(draftSavedAt)}).`
+            : draftSavedAt
+              ? `Draft saved on this device (${formatDraftTime(draftSavedAt)}).`
+              : "Drafts stay on this device until you submit or discard them."}
+        </p>
+        {(draftSavedAt || projectName || repositoryUrl || liveUrl || description) && (
+          <Button type="button" variant="outline" size="sm" onClick={discardDraft}>
+            Discard draft
+          </Button>
+        )}
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="projectName">Project name</Label>
         <Input
@@ -130,7 +224,9 @@ export function SubmissionForm() {
           value={projectName}
           onChange={(event) => setProjectName(event.target.value)}
           aria-invalid={Boolean(errors.projectName)}
-          aria-describedby={errors.projectName ? "projectName-error" : "projectName-hint"}
+          aria-describedby={
+            errors.projectName ? "projectName-error" : `projectName-hint ${draftStatusId}`
+          }
           disabled={submitting}
           required
         />
