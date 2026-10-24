@@ -6,7 +6,7 @@ Students submit a repository, live link, and project description. Mentors work t
 
 ## Current progress
 
-Phase 6: verification and delivery preparation. Integration checks, Playwright browser coverage (including keyboard, mobile, and failure recovery), CI workflow configuration, deployment documentation, and synthetic screenshots are in place. GitHub hosting and post-deadline public visibility still need an intended remote and deadline.
+Post–Phase 6 improvements: trusted Next.js API proxy behavior, structured mentor checkpoints, student submission drafts, mentor search with URL-backed queue controls, refreshed copy/screenshots, and extended checks. GitHub hosting, observed Actions CI, post-deadline public visibility, and Part 2 video lessons still need external inputs.
 
 - [Roadmap and completion criteria](docs/roadmap.md)
 - [Architecture](docs/architecture.md)
@@ -32,7 +32,7 @@ The Next.js scripts explicitly use Webpack. Turbopack's CSS worker failed during
 Browser  →  Next.js (public origin, /api proxy)  →  Express (private)  →  PostgreSQL
 ```
 
-Browsers call relative `/api/*` on the web origin. Next.js forwards those requests through `apps/web/src/app/api/[...path]/route.ts`, preserving `Origin`, `Cookie`, and `Set-Cookie`. Express owns validation, authorization, and database access. `API_INTERNAL_URL` is read by the Next.js server at request time and must point at the private Express process.
+Browsers call relative `/api/*` on the web origin. Next.js forwards those requests through `apps/web/src/app/api/[...path]/route.ts`, preserving an incoming `Origin` when present (never inventing one), plus `Cookie` and multiple `Set-Cookie` values. Caller-supplied forwarding headers are stripped so they cannot choose login/signup rate-limit buckets. Express owns validation, authorization, and database access. `API_INTERNAL_URL` is read by the Next.js server at request time and must point at the private Express process.
 
 ## Local development
 
@@ -85,6 +85,7 @@ Defaults:
 | `DATABASE_URL`                                        | `postgresql://reviewdock:reviewdock@127.0.0.1:5432/reviewdock?schema=public` | `apps/api/.env`              |
 | `PORT`                                                | `4000`                                                                       | `apps/api/.env`              |
 | `API_INTERNAL_URL`                                    | `http://127.0.0.1:4000`                                                      | `apps/web/.env.local`        |
+| `TRUST_INGRESS_CLIENT_IP`                             | unset / `0` (set `1` only behind a sanitizing ingress)                       | `apps/web/.env.local`        |
 | `JWT_SECRET`                                          | _(required, generate locally)_                                               | `apps/api/.env`              |
 | `JWT_ISSUER` / `JWT_AUDIENCE`                         | `reviewdock` / `reviewdock-web`                                              | `apps/api/.env`              |
 | `WEB_ORIGINS`                                         | `http://localhost:3000,http://127.0.0.1:3000`                                | `apps/api/.env`              |
@@ -171,20 +172,22 @@ curl -s -b cookies.txt -H "Origin: http://localhost:3000" -H "Content-Type: appl
 Mentor review queue, stats, and decision (use a seeded mentor session cookie):
 
 ```sh
-curl -s -b mentor.txt "http://localhost:3000/api/reviews/submissions?status=PENDING&page=1&pageSize=10"
+curl -s -b mentor.txt "http://localhost:3000/api/reviews/submissions?status=PENDING&page=1&pageSize=10&q=Demo"
 curl -s -b mentor.txt http://localhost:3000/api/reviews/stats
 curl -s -b mentor.txt -H "Origin: http://localhost:3000" -H "Content-Type: application/json" \
-  -d '{"decision":"REJECTED","note":"Please expand the README with setup steps."}' \
+  -d '{"decision":"REJECTED","note":"Please expand the README with setup steps.","checkpoints":{"functionality":"NEEDS_IMPROVEMENT","usability":"NOT_ASSESSED","documentation":"NEEDS_IMPROVEMENT"}}' \
   http://localhost:3000/api/reviews/submissions/<id>/decision
 ```
 
-Frontend routes: `/signup`, `/login`, `/student`, `/student/submit`, `/mentor`.
+Frontend routes: `/signup`, `/login`, `/student`, `/student/submit`, `/mentor`. Mentor queue URLs may include `q`, `status`, `page`, and `pageSize`.
+
+Students drafting a submission get an on-device autosave (project fields only, keyed by student ID). Mentors can search the queue and leave optional functionality/usability/documentation checkpoints with their decision.
 
 ### Authentication notes
 
 Sessions are 30-minute JWTs in the `reviewdock_session` HttpOnly cookie (`SameSite=Lax`, `Path=/`, `Secure` in production). Logout clears the browser cookie; a copied token remains valid until expiry. Passwords are at least 8 characters and at most 72 UTF-8 bytes and are never trimmed.
 
-Rate limits are in-memory per API process: 5 signups/hour/IP, 10 logins/15 minutes/IP, 5 submissions/10 minutes/student. `TRUST_PROXY=1` trusts one reverse-proxy hop for client IP when traffic arrives through Next.js.
+Rate limits are in-memory per API process: 5 signups/hour/IP, 10 logins/15 minutes/IP, 5 submissions/10 minutes/student. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through Next.js. By default the Next proxy strips caller `X-Forwarded-For`; login/signup then share the Next→Express peer bucket. For accurate per-IP limits, put a trusted ingress in front that **replaces** `X-Forwarded-For` with `$remote_addr` (or equivalent), keep Express private, and set `TRUST_INGRESS_CLIENT_IP=1` on the web app.
 
 ### Mentor seed
 
@@ -208,10 +211,21 @@ ReviewDock expects HTTPS in production so `Secure` session cookies work. Configu
 2. Seed the mentor once with deployment secrets (`MENTOR_*`), not on every release.
 3. Express privately reachable from Next.js via `API_INTERNAL_URL`.
 4. `WEB_ORIGINS` set to the public browser origin(s).
-5. `TRUST_PROXY=1` when Next.js (or another single hop) forwards client IP.
-6. A long random `JWT_SECRET` (≥ 32 characters).
+5. `TRUST_PROXY=1` on Express for the single Next.js hop.
+6. Optional: sanitizing ingress + `TRUST_INGRESS_CLIENT_IP=1` on Next for per-IP login/signup limits.
+7. A long random `JWT_SECRET` (≥ 32 characters).
+8. Apply the `review_checkpoints` migration with `npm run db:migrate:deploy` before serving traffic that expects structured feedback.
 
 Do not expose Express publicly if the Next.js `/api` proxy is the intended browser boundary. In-memory rate limits do not coordinate across multiple API processes. `npm run db:reset` destroys the configured database; prefer migrate deploy plus backups in production.
+
+Minimal ingress sketch (nginx) when accurate client IPs are required:
+
+```nginx
+# Strip client-supplied forwarding headers, then set a verified peer address.
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Real-IP $remote_addr;
+# Forward only to Next.js; keep Express on a private network.
+```
 
 This repository does not create paid hosting. Choose your own host and follow the topology above.
 
@@ -220,7 +234,9 @@ This repository does not create paid hosting. Choose your own host and follow th
 - Logout clears the browser cookie only; a copied JWT remains valid until expiry.
 - Rate limits are per process and reset on restart.
 - Mentors cannot reopen or edit decisions; students cannot resubmit the same canonical repository URL.
-- GitHub repository publishing and video lessons are outside Phase 6.
+- Without a sanitizing ingress, login/signup rate limits share the Next→Express peer address.
+- Submission drafts live only in browser storage on the current device.
+- GitHub publishing and Part 2 video lessons remain open until their inputs arrive.
 
 ## Continuous integration
 
@@ -235,7 +251,7 @@ apps/
   web/                  Next.js frontend, /api proxy route, shadcn/ui
   api/                  Express application, Prisma, integration checks
 e2e/                    Playwright specs and disposable-DB harness
-docs/                   Roadmap, architecture, decisions, screenshots
+docs/                   Roadmap, architecture, decisions, screenshots, video runbook
 .github/workflows/      CI
 compose.yaml            Local PostgreSQL
 ```
@@ -246,6 +262,8 @@ The assessment requires a reachable GitHub repository that becomes public after 
 
 - Intended GitHub account / repository URL
 - Authorization to push
+- Assessment deadline and timezone for public visibility
+- Detailed Part 2 video instructions (topics, duration, language, format, submission method)
 - Assessment deadline for making the repository public
 
 Until those are supplied, keep the GitHub push and public-visibility roadmap items open. Video lessons remain Phase 7.

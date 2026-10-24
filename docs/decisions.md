@@ -20,15 +20,19 @@ The server validates links but does not fetch them. GitHub verification and owne
 
 ## Review rules
 
-Statuses are `PENDING`, `APPROVED`, and `REJECTED`. A new submission is pending. Only pending submissions can receive a decision. Approvals can have an optional note; rejection requires a reason of 10–1,000 characters so the student receives usable feedback.
+Statuses are `PENDING`, `APPROVED`, and `REJECTED`. A new submission is pending. Only pending submissions can receive a decision. Approvals can have an optional note; rejection requires a reason of 10–1,000 characters so the student receives usable feedback. Mentors may also set optional checkpoints for functionality, usability, and documentation (`Meets expectations`, `Needs improvement`, or `Not assessed`). The overall approve/reject choice remains the mentor's explicit decision; the note carries actionable guidance. Review editing, reopening, appeals, and automatic grading are out of scope.
 
-Store who reviewed the project and when. If another mentor has already decided, return a conflict and reload the current result. Review history, reopening decisions, and appeals are future work.
+Store who reviewed the project and when. If another mentor has already decided, return a conflict and reload the current result. Legacy reviews without checkpoint values display as not assessed.
 
 ## Queue and statistics
 
-The mentor list defaults to pending, newest first, with 10 rows per page. Offer all, pending, approved, and rejected filters. Validate page numbers and cap page size at 50. All filtering, counting, and pagination happens on the server.
+The mentor list defaults to pending, newest first, with 10 rows per page. Offer all, pending, approved, and rejected filters, plus optional search (`q`, max 100 characters after trim) over project name, student name/email, and repository URL. Validate page numbers and cap page size at 50. All filtering, search, counting, and pagination happens on the server. The mentor UI mirrors `q`, `status`, `page`, and `pageSize` in the URL for refresh, direct links, and Back/Forward.
 
-Show pending, approved, rejected, and total counts across all submissions. Changing the table's filter does not change what those summary counts mean.
+Show pending, approved, rejected, and total counts across all submissions. Changing the table's filter or search does not change what those summary counts mean.
+
+## Student submission drafts
+
+The submission form autosaves `projectName`, `repositoryUrl`, `liveUrl`, and `description` to versioned browser `localStorage`, keyed by authenticated student ID. Drafts are debounced, restored after reload or navigation, and cleared only after a confirmed successful submit or an explicit Discard. Failed validation, duplicates, rate limits, and network errors keep the draft. Pending writes are cancelled when clearing so stale timers cannot recreate it. Logout and account changes clear in-memory form state and pending writes so one student never sees another's draft. Malformed, unavailable, or full storage must not break the form. Session tokens and passwords are never stored. Shared devices may retain another account's stored draft until overwritten or discarded; only the matching student ID can restore it. Server validation remains authoritative.
 
 ## Session and spam protection
 
@@ -38,7 +42,7 @@ Passwords are never trimmed. They must be at least 8 characters and at most 72 U
 
 Start with a 30-minute session and sign in again on expiry. Logout clears the browser cookie; a copied token remains valid until it expires. Immediate server-side revocation is outside this phase.
 
-Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, and 5 submission attempts per 10 minutes per student. Include HTTP 429 and retry information. The in-memory limiter suits a single API process; multi-instance deployments need a shared store. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through the Next.js `/api` rewrite.
+Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, and 5 submission attempts per 10 minutes per student. Include HTTP 429 and retry information. The in-memory limiter suits a single API process; multi-instance deployments need a shared store. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through the Next.js `/api` proxy. The Next proxy strips caller forwarding headers by default, so login/signup buckets share the Next→Express peer address unless a trusted ingress replaces `X-Forwarded-For` with the verified client IP and the web app sets `TRUST_INGRESS_CLIENT_IP=1`.
 
 ## Presentation
 

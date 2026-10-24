@@ -86,13 +86,25 @@ Local verification is complete. GitHub push, observed CI on GitHub Actions, and 
 
 Possible commits: `test: cover the submission and review lifecycle`, `ci: verify the web and API workspaces`, `docs: document setup and delivery`
 
+## Improvements (post Phase 6)
+
+- [x] Fix API proxy Origin handling and client-IP trust at the Next.js boundary.
+- [x] Add optional structured mentor feedback checkpoints with a forward migration.
+- [x] Add recoverable student submission drafts scoped by student ID.
+- [x] Add mentor search (`q`) with URL-backed queue controls.
+- [x] Refresh product copy and screenshots from the working app.
+- [x] Extend integration and Playwright coverage for the new behavior.
+- [x] Update README, architecture, and decisions to match verified behavior.
+- [ ] Push to the intended GitHub repository, observe Actions, and verify access.
+- [ ] Make the repository public after the assessment deadline.
+
 ## 7. Video lessons
 
 - [ ] Read the detailed Part 2 instructions before choosing lesson topics or duration.
 - [ ] Prepare two short lesson outlines using the finished implementation.
 - [ ] Record, review, and deliver the required videos.
 
-The supplied brief mentions two videos but does not include the lesson requirements. Keep this phase open until those instructions are available.
+The supplied brief mentions two videos but does not include the lesson requirements. A technical recording runbook lives under `docs/videos/`. Lesson topics and durations stay undecided until Part 2 instructions arrive.
 
 ## Working agreement
 

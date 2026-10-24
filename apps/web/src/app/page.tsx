@@ -73,7 +73,8 @@ export default function HomePage() {
         </section>
 
         <p className="mb-12 rounded-lg border bg-card px-5 py-4 text-sm leading-6 text-muted-foreground">
-          Accounts are ready. Submission and review tools will be available here in later phases.
+          Students can submit a project and track its status. Mentors can search the queue, leave a
+          decision, and share checkpoint feedback.
         </p>
       </main>
 

@@ -176,6 +176,9 @@ type QueueBody = {
     review: {
       decision: string;
       note: string | null;
+      functionality: string;
+      usability: string;
+      documentation: string;
       reviewedAt: string;
       mentor: { id: string; name: string };
     } | null;
@@ -370,6 +373,8 @@ async function main() {
       { query: "status=WAITING", label: "unknown status" },
       { query: "page=1&page=2", label: "repeated page" },
       { query: "status=PENDING&status=ALL", label: "repeated status" },
+      { query: `q=${"x".repeat(101)}`, label: "q too long" },
+      { query: "q=alpha&q=beta", label: "repeated q" },
     ];
     for (const testCase of invalidQueries) {
       const response = await requestJson(
@@ -694,6 +699,11 @@ async function main() {
       await decideSubmission(rollbackTarget, "nonexistent-mentor-id", {
         decision: ReviewDecision.APPROVED,
         note: null,
+        checkpoints: {
+          functionality: "NOT_ASSESSED",
+          usability: "NOT_ASSESSED",
+          documentation: "NOT_ASSESSED",
+        },
       });
     } catch {
       rolledBack = true;
@@ -708,6 +718,159 @@ async function main() {
       "no orphaned review after rollback",
     );
 
+    // Structured checkpoints persist atomically with the decision; legacy clients omit them.
+    const checkpointTarget = rollbackTarget;
+    const withCheckpoints = await requestJson(
+      baseUrl,
+      "POST",
+      `/api/reviews/submissions/${checkpointTarget}/decision`,
+      {
+        origin: TRUSTED_ORIGIN,
+        cookie: mentorA.cookie,
+        body: {
+          decision: "APPROVED",
+          note: "Solid demo with clear docs.",
+          checkpoints: {
+            functionality: "MEETS_EXPECTATIONS",
+            usability: "NEEDS_IMPROVEMENT",
+            documentation: "MEETS_EXPECTATIONS",
+          },
+        },
+      },
+    );
+    assert(withCheckpoints.status === 200, "checkpoint decision expected 200");
+    const checkpointed = (
+      withCheckpoints.body as {
+        submission: {
+          status: string;
+          review: {
+            functionality: string;
+            usability: string;
+            documentation: string;
+            note: string | null;
+          };
+        };
+      }
+    ).submission;
+    assert(checkpointed.status === "APPROVED", "checkpoint decision approved");
+    assert(checkpointed.review.functionality === "MEETS_EXPECTATIONS", "functionality stored");
+    assert(checkpointed.review.usability === "NEEDS_IMPROVEMENT", "usability stored");
+    assert(checkpointed.review.documentation === "MEETS_EXPECTATIONS", "documentation stored");
+    assert(
+      checkpointed.review.note === "Solid demo with clear docs.",
+      "note stored with checkpoints",
+    );
+
+    const invalidCheckpoint = await requestJson(
+      baseUrl,
+      "POST",
+      `/api/reviews/submissions/${pendingIds[0]}/decision`,
+      {
+        origin: TRUSTED_ORIGIN,
+        cookie: mentorA.cookie,
+        body: {
+          decision: "APPROVED",
+          checkpoints: { functionality: "GREAT" },
+        },
+      },
+    );
+    assert(invalidCheckpoint.status === 400, "invalid checkpoint expected 400");
+
+    // Legacy seeded reviews (no checkpoint columns set beyond DB default) read as NOT_ASSESSED.
+    const legacyList = await requestJson(
+      baseUrl,
+      "GET",
+      "/api/reviews/submissions?status=REJECTED&pageSize=50",
+      { cookie: mentorA.cookie },
+    );
+    assert(legacyList.status === 200, "legacy list expected 200");
+    const legacyRows = (legacyList.body as QueueBody).submissions;
+    assert(legacyRows.length >= 1, "expected legacy rejected rows");
+    assert(
+      legacyRows.every(
+        (row) =>
+          row.review &&
+          row.review.functionality === "NOT_ASSESSED" &&
+          row.review.usability === "NOT_ASSESSED" &&
+          row.review.documentation === "NOT_ASSESSED",
+      ),
+      "legacy reviews must display as unassessed",
+    );
+
+    // Search combines with status; pagination/count apply; global stats stay independent.
+    const statsBeforeSearch = await requestJson(baseUrl, "GET", "/api/reviews/stats", {
+      cookie: mentorA.cookie,
+    });
+    const statsBefore = (statsBeforeSearch.body as StatsBody).stats;
+    const searchPending = await requestJson(
+      baseUrl,
+      "GET",
+      "/api/reviews/submissions?status=PENDING&q=Project%2003&pageSize=50",
+      { cookie: mentorA.cookie },
+    );
+    assert(searchPending.status === 200, "search pending expected 200");
+    const searchBody = searchPending.body as QueueBody;
+    assert(searchBody.pagination.total === 0, "Project 03 is no longer pending after decisions");
+    const knownApproved = await prisma.submission.findFirstOrThrow({
+      where: { status: SubmissionStatus.APPROVED },
+      select: { repositoryUrl: true, projectName: true },
+    });
+    const repoNeedle = knownApproved.repositoryUrl.replace(/^https:\/\//, "").slice(0, 40);
+    const searchApproved = await requestJson(
+      baseUrl,
+      "GET",
+      `/api/reviews/submissions?status=APPROVED&q=${encodeURIComponent(repoNeedle)}&pageSize=50`,
+      { cookie: mentorA.cookie },
+    );
+    assert(searchApproved.status === 200, "search approved expected 200");
+    const searchApprovedBody = searchApproved.body as QueueBody;
+    assert(searchApprovedBody.pagination.total >= 1, "repository search should match");
+    assert(
+      searchApprovedBody.submissions.every((row) =>
+        row.repositoryUrl.toLowerCase().includes(repoNeedle.toLowerCase()),
+      ),
+      "search rows must match repository query",
+    );
+    const searchByName = await requestJson(
+      baseUrl,
+      "GET",
+      `/api/reviews/submissions?status=APPROVED&q=${encodeURIComponent(knownApproved.projectName)}&pageSize=50`,
+      { cookie: mentorA.cookie },
+    );
+    assert(searchByName.status === 200, "project name search expected 200");
+    assert(
+      (searchByName.body as QueueBody).pagination.total >= 1,
+      "project name search should match",
+    );
+    const searchStudent = await requestJson(
+      baseUrl,
+      "GET",
+      "/api/reviews/submissions?status=ALL&q=Student%20R&pageSize=50",
+      { cookie: mentorA.cookie },
+    );
+    assert(searchStudent.status === 200, "student name search expected 200");
+    assert(
+      (searchStudent.body as QueueBody).pagination.total >= 1,
+      "student name search should return rows",
+    );
+    const statsAfterSearch = await requestJson(baseUrl, "GET", "/api/reviews/stats", {
+      cookie: mentorA.cookie,
+    });
+    assert(
+      JSON.stringify((statsAfterSearch.body as StatsBody).stats) === JSON.stringify(statsBefore),
+      "global stats must not change when only search/filter changes",
+    );
+
+    // Exact numeric statistics after the decisions above (race winner is either approve or reject).
+    const finalStats = (statsAfterSearch.body as StatsBody).stats;
+    assert(finalStats.pending === 0, `pending must be 0, got ${finalStats.pending}`);
+    assert(finalStats.total === 12, `total must be 12, got ${finalStats.total}`);
+    assert(
+      (finalStats.approved === 7 && finalStats.rejected === 5) ||
+        (finalStats.approved === 6 && finalStats.rejected === 6),
+      `unexpected approved/rejected after race: ${JSON.stringify(finalStats)}`,
+    );
+
     // Student sees updated status/feedback through /mine
     const mine = await requestJson(baseUrl, "GET", "/api/submissions/mine", {
       cookie: studentCookie,
@@ -718,7 +881,13 @@ async function main() {
         submissions: Array<{
           id: string;
           status: string;
-          review: { note: string | null; decision: string } | null;
+          review: {
+            note: string | null;
+            decision: string;
+            functionality: string;
+            usability: string;
+            documentation: string;
+          } | null;
         }>;
       }
     ).submissions;
@@ -727,6 +896,12 @@ async function main() {
     assert(rejectedMine?.review?.note?.includes("README"), "student sees rejection feedback");
     const approvedMine = mineRows.find((item) => item.id === pendingIds[0]);
     assert(approvedMine?.status === "APPROVED", "student sees approved status");
+    const checkpointMine = mineRows.find((item) => item.id === checkpointTarget);
+    assert(
+      checkpointMine?.review?.functionality === "MEETS_EXPECTATIONS",
+      "student sees checkpoint",
+    );
+    assert(checkpointMine?.review?.usability === "NEEDS_IMPROVEMENT", "student sees usability");
 
     console.info("Review checks passed.");
   } finally {
