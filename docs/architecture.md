@@ -34,7 +34,7 @@ apps/
       features/
         auth/                     Session provider, forms, guards
         submissions/              Submit form and project list
-        reviews/                  Mentor queue, stats, and decision dialog
+        reviews/                  Queue composition, store, query helpers, and dialog
       lib/
         api.ts                    Relative /api fetch helper
         utils.ts
@@ -119,3 +119,11 @@ Integration tests use isolated PostgreSQL databases and clean up after failures.
 The foundation uses ESLint 9 because the React, import, and accessibility plugins bundled by Next.js 16.4.2 declare support through that major version. npm currently emits a deprecation notice for ESLint 9. Move to ESLint 10 when those plugins support it; do not bypass their peer requirements.
 
 Reference documentation: [Next.js installation](https://nextjs.org/docs/app/getting-started/installation), [Tailwind with Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs), [shadcn/ui setup](https://ui.shadcn.com/docs/installation/next), [Express setup](https://expressjs.com/en/starter/hello-world/), and [Prisma PostgreSQL quickstart](https://www.prisma.io/docs/orm/overview/databases/postgresql).
+
+## Maintenance and lifecycle contracts
+
+The mentor feature separates `mentor-queue.tsx` (composition), `mentor-queue-store.ts` (request sequencing/cache), `queue-query.ts` (URL contracts), `review-dialog.tsx` (dialog presentation), and `presentation.ts` (display formatting). Browser stores use stable server snapshots; account changes invalidate private caches and in-flight requests. Authenticated API 401 responses notify the session provider so guards can navigate to login. Logout is acknowledged only after the API clears the cookie.
+
+API routes share field-error serialization in `lib/validation.ts`, explicit safe user selection in `lib/public-user.ts`, and the same password/email helpers as the mentor seed. Shutdown drains HTTP requests before disconnecting Prisma. The web proxy maps upstream connection/timeout failures to safe JSON gateway errors.
+
+`tsconfig.tooling.json` adds strict checks for integration tests, Prisma seed/configuration, and Playwright. The normal root `check` command also lints those files. Contributor standards live in `CONTRIBUTING.md`; release requirements and remaining operational limits live in `docs/operations.md`.

@@ -19,4 +19,5 @@ apps/api/src/generated/
 /playwright/.cache/
 /e2e/.runtime/
 /e2e/.auth/
+/.local/
 

@@ -95,6 +95,10 @@ Possible commits: `test: cover the submission and review lifecycle`, `ci: verify
 - [x] Refresh product copy and screenshots from the working app.
 - [x] Extend integration and Playwright coverage for the new behavior.
 - [x] Update README, architecture, and decisions to match verified behavior.
+- [x] Separate mentor request state, URL helpers, and dialog presentation; share API contracts and seed helpers.
+- [x] Enforce strict TypeScript/lint checks for integration tests, seed/configuration, and browser tooling.
+- [x] Cover logout failures, open-workspace expiry, proxy gateway failures, and reliable test cleanup.
+- [x] Document contribution standards, shell-specific API examples, and production release prerequisites.
 - [ ] Push to the intended GitHub repository, observe Actions, and verify access.
 - [ ] Make the repository public after the assessment deadline.
 

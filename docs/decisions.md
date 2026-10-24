@@ -10,11 +10,11 @@ Emails are trimmed and normalized before storage. Passwords are hashed. The API 
 
 ## Submission rules
 
-All four project fields are required. Planned limits are 3–100 characters for the name, 20–5,000 for the description, and 2,048 for each URL. Text is trimmed; whitespace-only values fail validation. Links must be valid HTTPS URLs without embedded credentials. Render descriptions as plain text.
+All four project fields are required. Enforced limits are 3–100 characters for the name, 20–5,000 for the description, and 2,048 for each URL. Text is trimmed; whitespace-only values fail validation. Links must be valid HTTPS URLs without embedded credentials. Render descriptions as plain text.
 
 A student may submit multiple distinct projects. A repository may appear only once across the workspace, even after rejection. Team submissions, edits, deletion, and resubmission are outside the initial scope.
 
-Canonical repository URLs ignore trailing slashes, a final `.git`, query parameters, and fragments. Hosts are normalized; GitHub owner and repository names are case-insensitive. Preserve path case for other hosts. Explicit examples live in `apps/api/src/lib/canonical-repository-url.ts` and `npm run submissions:check`. A database unique constraint handles races; a disabled submit button alone cannot prevent duplicates.
+Canonical repository URLs ignore trailing slashes, a final `.git`, query parameters, and fragments. Hosts are normalized; GitHub owner and repository names are case-insensitive. Preserve path case, internal path separators, non-default ports, and distinct hostnames for other hosts. Explicit examples live in `apps/api/src/lib/canonical-repository-url.ts` and `npm run submissions:check`. A database unique constraint handles races; a disabled submit button alone cannot prevent duplicates.
 
 The server validates links but does not fetch them. GitHub verification and ownership checks are outside this assessment's requested scope.
 
@@ -40,7 +40,7 @@ Use a signed, expiring JWT (`jose`, HS256) in an HttpOnly, SameSite=Lax, host-on
 
 Passwords are never trimmed. They must be at least 8 characters and at most 72 UTF-8 bytes so bcrypt cannot silently truncate them. Public signup always creates `STUDENT` accounts; clients cannot set `role`.
 
-Start with a 30-minute session and sign in again on expiry. Logout clears the browser cookie; a copied token remains valid until it expires. Immediate server-side revocation is outside this phase.
+Start with a 30-minute session and sign in again on expiry. Logout clears the browser cookie; a failed logout keeps the session visible and provides a retry. Protected API 401 responses return an open workspace to login. A copied token remains valid until it expires. Immediate server-side revocation is outside this phase.
 
 Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, and 5 submission attempts per 10 minutes per student. Include HTTP 429 and retry information. The in-memory limiter suits a single API process; multi-instance deployments need a shared store. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through the Next.js `/api` proxy. The Next proxy strips caller forwarding headers by default, so login/signup buckets share the Next→Express peer address unless a trusted ingress replaces `X-Forwarded-For` with the verified client IP and the web app sets `TRUST_INGRESS_CLIENT_IP=1`.
 

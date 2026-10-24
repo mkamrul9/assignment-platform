@@ -2,41 +2,73 @@
 
 A project submission and review workspace for students and mentors.
 
-Students submit a repository, live link, and project description. Mentors work through a review queue, leave a decision, and see submission totals at a glance.
+Students sign up, draft and submit projects, and see review feedback. Mentors search and paginate the queue, see global totals, and approve or reject pending projects with notes and optional functionality/usability/documentation checkpoints.
 
-## Current progress
+The application is implemented and covered by local integration and Chromium browser checks. GitHub delivery and observed Actions CI remain pending. Deployment verification is separate from local test results; see [operations and release readiness](docs/operations.md).
 
-Post–Phase 6 improvements: trusted Next.js API proxy behavior, structured mentor checkpoints, student submission drafts, mentor search with URL-backed queue controls, refreshed copy/screenshots, and extended checks. GitHub hosting, observed Actions CI, post-deadline public visibility, and Part 2 video lessons still need external inputs.
+- [Architecture and folder responsibilities](docs/architecture.md)
+- [Product decisions and limitations](docs/decisions.md)
+- [Roadmap and delivery status](docs/roadmap.md)
+- [Contribution and code standards](CONTRIBUTING.md)
+- [API guide: Bash and PowerShell examples](docs/api.md)
 
-- [Roadmap and completion criteria](docs/roadmap.md)
-- [Architecture](docs/architecture.md)
-- [Product decisions](docs/decisions.md)
-- [Screenshots](docs/screenshots/)
+## Stack and topology
 
-## Stack
-
-- TypeScript throughout
-- Next.js App Router, Tailwind CSS, and shadcn/ui
-- Express.js as the application API
-- PostgreSQL and Prisma ORM
-- JWT cookie sessions (`jose`) with student and mentor roles
-- Playwright end-to-end tests against a disposable database
-
-The repository uses npm workspaces. The homepage and `GET /api/health` do not require PostgreSQL. Authentication, submissions, and reviews do.
-
-The Next.js scripts explicitly use Webpack. Turbopack's CSS worker failed during setup on this Windows machine; the supported Webpack build passes with the same application code.
-
-## Topology
+TypeScript, npm workspaces, Next.js App Router, Tailwind CSS, shadcn/ui conventions, Express, PostgreSQL, Prisma ORM, bcryptjs, jose, and Playwright.
 
 ```text
-Browser  →  Next.js (public origin, /api proxy)  →  Express (private)  →  PostgreSQL
+Browser -> Next.js (/api proxy) -> private Express API -> PostgreSQL
 ```
 
-Browsers call relative `/api/*` on the web origin. Next.js forwards those requests through `apps/web/src/app/api/[...path]/route.ts`, preserving an incoming `Origin` when present (never inventing one), plus `Cookie` and multiple `Set-Cookie` values. Caller-supplied forwarding headers are stripped so they cannot choose login/signup rate-limit buckets. Express owns validation, authorization, and database access. `API_INTERNAL_URL` is read by the Next.js server at request time and must point at the private Express process.
+Browsers use relative `/api` URLs. Next forwards the incoming Origin, cookies, and multiple Set-Cookie values. It never invents an Origin and strips caller-controlled forwarding headers by default. Express owns validation, authentication, authorization, transactions, and database access.
 
-## Local development
+`API_INTERNAL_URL` is server-only and read at runtime. Keep signing and database secrets out of the frontend environment. Webpack remains enabled because Turbopack's CSS worker failed on the original Windows setup.
 
-Use Node.js 24.11.1 (see `.nvmrc`) and npm 10 or newer. Node.js 22.18 or newer in the 22.x line is also supported.
+## Setup
+
+Use Node.js **24.11.1** (`.nvmrc`) and npm 10 or newer. Node.js 22.18 or newer in the 22.x line is also supported. PostgreSQL 16 via Docker Compose is the local database option.
+
+Run commands from the repository root. Configure environment files **before** running migrations, seed, or startup. Preserve existing files and configured database ports.
+
+### 1. Create missing environment files
+
+Bash:
+
+```sh
+test -e .env || cp .env.example .env
+test -e apps/api/.env || cp apps/api/.env.example apps/api/.env
+test -e apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local
+```
+
+PowerShell:
+
+```powershell
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
+if (!(Test-Path apps/api/.env)) { Copy-Item apps/api/.env.example apps/api/.env }
+if (!(Test-Path apps/web/.env.local)) { Copy-Item apps/web/.env.example apps/web/.env.local }
+```
+
+Generate a signing secret using this command in either shell, then put its output in `apps/api/.env` as `JWT_SECRET`:
+
+```sh
+node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
+```
+
+Set `MENTOR_NAME`, `MENTOR_EMAIL`, and `MENTOR_PASSWORD` in that same file before seeding. Example credentials are development placeholders; choose your own. Do not commit real environment files.
+
+Configuration locations:
+
+- Root `.env`: Compose `POSTGRES_PORT` (5432), `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` (development defaults: `reviewdock`).
+- `apps/api/.env`: `DATABASE_URL`, `PORT` (4000), `JWT_SECRET` (required, at least 32 characters), `JWT_ISSUER` (`reviewdock`), `JWT_AUDIENCE` (`reviewdock-web`), `WEB_ORIGINS`, `TRUST_PROXY`, and seed-only `MENTOR_*` variables.
+- `apps/web/.env.local`: `API_INTERNAL_URL` (`http://127.0.0.1:4000`) and optional `TRUST_INGRESS_CLIENT_IP` (off by default).
+
+`WEB_ORIGINS` defaults to `http://localhost:3000,http://127.0.0.1:3000`. The API defaults to not trusting proxies; its example file sets `TRUST_PROXY=1` for the single Next.js hop. If 5432 is occupied, change both Compose `POSTGRES_PORT` and the host port in `DATABASE_URL`. Existing installations should retain their configured port.
+
+API, seed, and Prisma commands load `apps/api/.env` regardless of the invoking directory. Existing process environment variables take precedence. Next loads its own web environment. Use development mode for local HTTP authentication.
+
+### 2. Install, migrate, seed, and start
+
+These commands work in Bash and PowerShell:
 
 ```sh
 npm ci --include=dev
@@ -46,81 +78,39 @@ npm run db:seed
 npm run dev
 ```
 
-Use `npm ci --include=dev` (or unset `NODE_ENV`) so workspace `devDependencies` such as Tailwind and TypeScript types are installed. A shell left with `NODE_ENV=production` makes plain `npm ci` skip those packages.
+`--include=dev` ensures compilation/test dependencies are installed even if the shell previously set `NODE_ENV=production`. Open [localhost:3000](http://localhost:3000). Express defaults to port 4000. Ctrl+C stops both development apps.
 
-Open [localhost:3000](http://localhost:3000). The Express API runs on port 4000.
+The homepage and `GET /api/health` work without PostgreSQL; account and project features require it. Repeated mentor seeding leaves an existing mentor and password unchanged. A seed email owned by a student is rejected.
 
-### Environment files
-
-Copy the examples before changing defaults. Environment files are ignored by Git. If you already have a working `apps/api/.env`, keep its `DATABASE_URL` host port and add any new keys from `.env.example`.
-
-Bash:
+## Commands and verification
 
 ```sh
-cp .env.example .env
-cp apps/api/.env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env.local
+npm run dev                  # Both apps
+npm run dev:web              # Next.js only
+npm run dev:api              # Express only
+npm run format               # Format project files
+npm run check                # Formatting, lint, strict TypeScript, including test tooling
+npm run build                # Production builds for both workspaces
+
+npm run db:up                # Start PostgreSQL
+npm run db:down              # Stop PostgreSQL, keep its volume
+npm run db:generate          # Generate Prisma client (also done on install/build/check)
+npm run db:migrate           # Create/apply development migrations
+npm run db:migrate:deploy    # Apply committed migrations
+npm run db:seed              # Seed mentor from API environment
+npm run db:reset             # DESTRUCTIVE: reset the configured database; does not seed
+
+npm run db:check             # Disposable PostgreSQL persistence checks
+npm run auth:check           # Auth, cookies, roles, Origin, limits
+npm run submissions:check    # Validation, ownership, duplicate races, limits
+npm run reviews:check        # Queue/search, stats, decisions, races, rollback
+npm run test:e2e             # Build, then run Chromium browser checks
+npm run test:e2e:ui          # Build, then open the Playwright UI
 ```
 
-Windows PowerShell:
+Run `check`, `build`, and the test suites sequentially against the same checkout; simultaneous Prisma generation can race. `check` includes integration checks, Prisma seed/configuration, and Playwright tooling through `tsconfig.tooling.json` and the tooling lint command.
 
-```powershell
-Copy-Item .env.example .env
-Copy-Item apps/api/.env.example apps/api/.env
-Copy-Item apps/web/.env.example apps/web/.env.local
-```
-
-Generate a session secret and put it in `apps/api/.env`:
-
-```sh
-openssl rand -base64 48
-```
-
-Defaults:
-
-| Variable                                              | Default                                                                      | Where                        |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------- |
-| `POSTGRES_PORT`                                       | `5432`                                                                       | root `.env` / `compose.yaml` |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `reviewdock`                                                                 | root `.env` / `compose.yaml` |
-| `DATABASE_URL`                                        | `postgresql://reviewdock:reviewdock@127.0.0.1:5432/reviewdock?schema=public` | `apps/api/.env`              |
-| `PORT`                                                | `4000`                                                                       | `apps/api/.env`              |
-| `API_INTERNAL_URL`                                    | `http://127.0.0.1:4000`                                                      | `apps/web/.env.local`        |
-| `TRUST_INGRESS_CLIENT_IP`                             | unset / `0` (set `1` only behind a sanitizing ingress)                       | `apps/web/.env.local`        |
-| `JWT_SECRET`                                          | _(required, generate locally)_                                               | `apps/api/.env`              |
-| `JWT_ISSUER` / `JWT_AUDIENCE`                         | `reviewdock` / `reviewdock-web`                                              | `apps/api/.env`              |
-| `WEB_ORIGINS`                                         | `http://localhost:3000,http://127.0.0.1:3000`                                | `apps/api/.env`              |
-| `TRUST_PROXY`                                         | `1`                                                                          | `apps/api/.env`              |
-| `MENTOR_*`                                            | example placeholders                                                         | `apps/api/.env` (seed only)  |
-
-If host port `5432` is already in use, set `POSTGRES_PORT` in the root `.env` and the matching host port in `apps/api/.env` `DATABASE_URL`.
-
-### Commands
-
-```sh
-npm run dev              # Run both apps; Ctrl+C stops them
-npm run check            # Formatting, linting, and TypeScript checks
-npm run build            # Production builds for both workspaces
-npm run format           # Format tracked source and documentation
-
-npm run db:up            # Start local PostgreSQL (Docker Compose)
-npm run db:down          # Stop PostgreSQL without deleting the volume
-npm run db:migrate:deploy # Apply committed migrations
-npm run db:seed          # Seed the mentor account from apps/api/.env
-npm run db:reset         # Destructive: drop data, re-apply migrations (does not auto-seed)
-
-npm run db:check         # Isolated disposable-DB persistence checks
-npm run auth:check       # Isolated disposable-DB authentication checks
-npm run submissions:check # Isolated disposable-DB submission checks
-npm run reviews:check    # Isolated disposable-DB mentor review checks
-npm run test:e2e         # Build both apps, then run Playwright
-npm run test:e2e:ui      # Same, with the Playwright UI
-```
-
-`npm run db:down` stops the container and keeps the named Docker volume. `npm run db:reset` is destructive for the database named in `DATABASE_URL`. After a reset, run `npm run db:seed` again if you need the mentor account. Integration and e2e suites create disposable databases and clean them up; they do not wipe the development database.
-
-Browser tests use ports `3010` and `4010` by default (`E2E_WEB_PORT` / `E2E_API_PORT`). If a port is occupied, the suite exits without terminating its owner. `E2E_DATABASE_NAME` must be `reviewdock_e2e` or start with `reviewdock_e2e_`, and must differ from the database in `DATABASE_URL`. Setup failures also clean up the disposable database. Run commands that generate Prisma (`check` and `build`) sequentially against the same checkout.
-
-First Playwright run also needs browsers:
+Before the first browser run:
 
 ```sh
 npx playwright install chromium
@@ -128,144 +118,61 @@ npx playwright install chromium
 
 On Linux CI, use `npx playwright install chromium --with-deps`.
 
-## Screenshots
+Database tests require a PostgreSQL test user allowed to create/drop databases. They use disposable databases; browser tests seed synthetic accounts and more than one page of projects. E2E starts built Next.js and Express processes on ports 3010/4010, waits for readiness, and cleans up its own processes/database after completion or setup failure. Local E2E runs the API in test mode for HTTP cookies; production cookie security is unchanged.
 
-Captured from the working app with synthetic e2e data:
+Use `E2E_WEB_PORT` / `E2E_API_PORT` for alternate test ports. Occupied ports cause a clear error; the suite never kills their owner. `E2E_DATABASE_NAME` must be `reviewdock_e2e` or start with `reviewdock_e2e_` and must differ from the development database. Reports, traces, credentials, and runtime state are gitignored.
 
-| File                                                                                       | Scene                              |
-| ------------------------------------------------------------------------------------------ | ---------------------------------- |
-| [docs/screenshots/student-empty.png](docs/screenshots/student-empty.png)                   | New student empty project list     |
-| [docs/screenshots/student-submit-success.png](docs/screenshots/student-submit-success.png) | Successful submission confirmation |
-| [docs/screenshots/student-projects.png](docs/screenshots/student-projects.png)             | Student project list with status   |
-| [docs/screenshots/mentor-queue.png](docs/screenshots/mentor-queue.png)                     | Mentor stats and review queue      |
-| [docs/screenshots/mentor-review-dialog.png](docs/screenshots/mentor-review-dialog.png)     | Review dialog after a decision     |
+Browser coverage includes lifecycle, drafts, feedback checkpoints, filters/search/pagination, keyboard dialogs, mobile layouts, session expiry, and intercepted error/retry scenarios. Direct helper regressions cover proxy failure contracts and database reset safeguards. See the test output for the checks actually run; passing automated checks does not replace screen-reader, cross-browser, or load testing.
 
-## API examples
+## API and screenshots
 
-Health (PostgreSQL not required):
+[The API guide](docs/api.md) documents requests, responses, permissions, pagination, and a complete student-to-mentor-to-student sequence in both shells.
 
 ```sh
 curl -s http://localhost:4000/api/health
 curl -s http://localhost:3000/api/health
 ```
 
-```json
-{ "status": "ok", "service": "reviewdock-api" }
-```
+Both return `{ "status": "ok", "service": "reviewdock-api" }` when the corresponding process/proxy is available.
 
-Student signup and session (browser Origin required for mutations):
+Screenshots captured from the working application with synthetic accounts:
 
-```sh
-curl -s -c cookies.txt -H "Origin: http://localhost:3000" -H "Content-Type: application/json" \
-  -d '{"name":"Ada Student","email":"ada@example.com","password":"student-pass-1"}' \
-  http://localhost:3000/api/auth/signup
+- [Student empty state](docs/screenshots/student-empty.png)
+- [Submission confirmation](docs/screenshots/student-submit-success.png)
+- [Student projects and feedback](docs/screenshots/student-projects.png)
+- [Mentor queue](docs/screenshots/mentor-queue.png)
+- [Review dialog](docs/screenshots/mentor-review-dialog.png)
 
-curl -s -b cookies.txt http://localhost:3000/api/auth/me
-```
+## Production operation and limitations
 
-Submit a project:
+Read [operations](docs/operations.md) before release. Run **both apps** with `NODE_ENV=production`, keep Express private, and serve the public web origin over HTTPS. Express then uses Secure, HttpOnly, host-only, SameSite=Lax session cookies. Configure exact trusted Origins, migrations, seed ordering, backups, process supervision, and monitoring for the chosen host.
 
-```sh
-curl -s -b cookies.txt -H "Origin: http://localhost:3000" -H "Content-Type: application/json" \
-  -d '{"projectName":"Demo Project","repositoryUrl":"https://github.com/example/demo","liveUrl":"https://demo.example.com","description":"A long enough description for the API example."}' \
-  http://localhost:3000/api/submissions
-```
+The proxy maps upstream connection errors to JSON 502 and upstream timeouts to JSON 504. API shutdown drains active requests and disconnects Prisma within a bounded deadline.
 
-Mentor review queue, stats, and decision (use a seeded mentor session cookie):
+Known scope and deployment limits:
 
-```sh
-curl -s -b mentor.txt "http://localhost:3000/api/reviews/submissions?status=PENDING&page=1&pageSize=10&q=Demo"
-curl -s -b mentor.txt http://localhost:3000/api/reviews/stats
-curl -s -b mentor.txt -H "Origin: http://localhost:3000" -H "Content-Type: application/json" \
-  -d '{"decision":"REJECTED","note":"Please expand the README with setup steps.","checkpoints":{"functionality":"NEEDS_IMPROVEMENT","usability":"NOT_ASSESSED","documentation":"NEEDS_IMPROVEMENT"}}' \
-  http://localhost:3000/api/reviews/submissions/<id>/decision
-```
+- JWT sessions last 30 minutes. Logout clears the browser cookie; copied tokens remain valid until expiry. Passwords are never trimmed and must fit bcrypt's 72-byte UTF-8 limit.
+- Rate limits are in-memory per API process and reset on restart: signup 5/hour/IP, login 10/15 minutes/IP, submissions 5/10 minutes/student. Multiple API instances need a shared limiter store.
+- Without a sanitizing ingress, login/signup share the Next-to-Express peer IP. Enable `TRUST_INGRESS_CLIENT_IP=1` only behind an ingress that replaces forwarding headers with a verified client address and cannot be bypassed.
+- Drafts live in versioned, student-scoped local browser storage. They are not server backups.
+- Mentors cannot edit or reopen decisions; students cannot resubmit an already-used canonical repository URL. There is no account-recovery flow.
+- Health is process liveness, not a database readiness check. Backups and capacity/load testing are deployment responsibilities.
 
-Frontend routes: `/signup`, `/login`, `/student`, `/student/submit`, `/mentor`. Mentor queue URLs may include `q`, `status`, `page`, and `pageSize`.
+## CI and delivery
 
-Students drafting a submission get an on-device autosave (project fields only, keyed by student ID). Mentors can search the queue and leave optional functionality/usability/documentation checkpoints with their decision.
+[The workflow](.github/workflows/ci.yml) is configured for pushes and pull requests: Node from `.nvmrc`, `npm ci --include=dev`, checks, production builds, PostgreSQL integration tests, and Chromium E2E. Failure reports/traces are uploaded. It uses synthetic credentials, not private production secrets.
 
-### Authentication notes
-
-Sessions are 30-minute JWTs in the `reviewdock_session` HttpOnly cookie (`SameSite=Lax`, `Path=/`, `Secure` in production). Logout clears the browser cookie; a copied token remains valid until expiry. Passwords are at least 8 characters and at most 72 UTF-8 bytes and are never trimmed.
-
-Rate limits are in-memory per API process: 5 signups/hour/IP, 10 logins/15 minutes/IP, 5 submissions/10 minutes/student. `TRUST_PROXY=1` trusts one reverse-proxy hop for `req.ip` when traffic arrives through Next.js. By default the Next proxy strips caller `X-Forwarded-For`; login/signup then share the Next→Express peer bucket. For accurate per-IP limits, put a trusted ingress in front that **replaces** `X-Forwarded-For` with `$remote_addr` (or equivalent), keep Express private, and set `TRUST_INGRESS_CLIENT_IP=1` on the web app.
-
-### Mentor seed
-
-Set `MENTOR_NAME`, `MENTOR_EMAIL`, and `MENTOR_PASSWORD` in `apps/api/.env`, then run `npm run db:seed`. Re-running the seed leaves an existing mentor unchanged. If the email already belongs to a student, the seed fails instead of granting mentor access.
-
-## Production build smoke
-
-```sh
-npm run build
-npm run start --workspace=@reviewdock/api
-npm run start --workspace=@reviewdock/web
-```
-
-Point `API_INTERNAL_URL` at the running Express process before starting Next.js. Confirm homepage, direct health, and proxied health. Health remains independent of PostgreSQL.
-
-## Deployment notes
-
-ReviewDock expects HTTPS in production so `Secure` session cookies work. Configure:
-
-1. PostgreSQL with backups; apply committed migrations (`npm run db:migrate:deploy`) before serving traffic.
-2. Seed the mentor once with deployment secrets (`MENTOR_*`), not on every release.
-3. Express privately reachable from Next.js via `API_INTERNAL_URL`.
-4. `WEB_ORIGINS` set to the public browser origin(s).
-5. `TRUST_PROXY=1` on Express for the single Next.js hop.
-6. Optional: sanitizing ingress + `TRUST_INGRESS_CLIENT_IP=1` on Next for per-IP login/signup limits.
-7. A long random `JWT_SECRET` (≥ 32 characters).
-8. Apply the `review_checkpoints` migration with `npm run db:migrate:deploy` before serving traffic that expects structured feedback.
-
-Do not expose Express publicly if the Next.js `/api` proxy is the intended browser boundary. In-memory rate limits do not coordinate across multiple API processes. `npm run db:reset` destroys the configured database; prefer migrate deploy plus backups in production.
-
-Minimal ingress sketch (nginx) when accurate client IPs are required:
-
-```nginx
-# Strip client-supplied forwarding headers, then set a verified peer address.
-proxy_set_header X-Forwarded-For $remote_addr;
-proxy_set_header X-Real-IP $remote_addr;
-# Forward only to Next.js; keep Express on a private network.
-```
-
-This repository does not create paid hosting. Choose your own host and follow the topology above.
-
-## Known limitations
-
-- Logout clears the browser cookie only; a copied JWT remains valid until expiry.
-- Rate limits are per process and reset on restart.
-- Mentors cannot reopen or edit decisions; students cannot resubmit the same canonical repository URL.
-- Without a sanitizing ingress, login/signup rate limits share the Next→Express peer address.
-- Submission drafts live only in browser storage on the current device.
-- GitHub publishing and Part 2 video lessons remain open until their inputs arrive.
-
-## Continuous integration
-
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes and pull requests: `npm ci`, formatting/lint/typecheck, production builds, disposable-DB integration checks, Playwright Chromium install, and e2e tests. Failure reports/traces upload as artifacts. Private production credentials are not required; CI uses workflow-local secrets and a PostgreSQL service container.
-
-A workflow file being present is not the same as a green run on GitHub. Observe the Actions tab after a remote is configured and a push succeeds.
+A configured workflow is not an observed passing GitHub run. No remote is currently configured. Remaining delivery inputs are the intended repository URL/push authorization, the assessment deadline and timezone for public visibility, and detailed Part 2 video requirements. Corresponding roadmap items remain open.
 
 ## Repository layout
 
 ```text
-apps/
-  web/                  Next.js frontend, /api proxy route, shadcn/ui
-  api/                  Express application, Prisma, integration checks
-e2e/                    Playwright specs and disposable-DB harness
-docs/                   Roadmap, architecture, decisions, screenshots, video runbook
-.github/workflows/      CI
-compose.yaml            Local PostgreSQL
+apps/api/                  Express, Prisma, integration checks
+apps/web/                  Next.js routes, feature modules, shared UI
+e2e/                       Playwright specs and isolated test harness
+docs/                      Architecture, API, decisions, operations, screenshots
+.github/workflows/ci.yml    Verification workflow
+CONTRIBUTING.md            Coding and contribution standards
+tsconfig.tooling.json      Strict checks for tests, seed, and tooling
+compose.yaml               Local PostgreSQL with persistent storage
 ```
-
-## Submission handoff
-
-The assessment requires a reachable GitHub repository that becomes public after the submission deadline. No git remote is configured in this working copy yet. Missing inputs for the remaining delivery items:
-
-- Intended GitHub account / repository URL
-- Authorization to push
-- Assessment deadline and timezone for public visibility
-- Detailed Part 2 video instructions (topics, duration, language, format, submission method)
-- Assessment deadline for making the repository public
-
-Until those are supplied, keep the GitHub push and public-visibility roadmap items open. Video lessons remain Phase 7.
