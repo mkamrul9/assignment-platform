@@ -1,8 +1,8 @@
 import { Router } from "express";
-import type { ZodError } from "zod";
 
 import { Role } from "../../generated/prisma/client.js";
 import { sendError } from "../../lib/http.js";
+import { validationDetails } from "../../lib/validation.js";
 import { authenticate } from "../../middleware/authenticate.js";
 import { requireRole } from "../../middleware/require-role.js";
 import { requireTrustedOrigin } from "../../middleware/require-trusted-origin.js";
@@ -14,13 +14,6 @@ import {
   ReviewNotFoundError,
 } from "./reviews.service.js";
 import { decisionBodySchema, queueQuerySchema } from "./reviews.schemas.js";
-
-function validationDetails(error: ZodError) {
-  return error.issues.map((issue) => ({
-    path: issue.path.join(".") || "body",
-    message: issue.message,
-  }));
-}
 
 function rejectRepeatedQuery(
   query: Record<string, unknown>,

@@ -1,3 +1,5 @@
+import process from "node:process";
+import console from "node:console";
 import pg from "pg";
 
 const connectionString = process.argv[2];

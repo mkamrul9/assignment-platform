@@ -169,7 +169,7 @@ function validPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function main() {
+async function runChecks() {
   const { canonicalizeRepositoryUrl } = await import("../src/lib/canonical-repository-url.js");
 
   const examples = [
@@ -567,6 +567,14 @@ async function main() {
       rate.server.close((error) => (error ? reject(error) : resolve()));
     });
     await prisma.$disconnect();
+  }
+}
+
+async function main() {
+  // Cleanup also covers migration/import failures and failures before the limiter phase.
+  try {
+    await runChecks();
+  } finally {
     await dropTestDatabase(DEV_DATABASE_URL, TEST_DATABASE_NAME);
   }
 }

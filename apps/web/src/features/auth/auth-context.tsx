@@ -13,6 +13,8 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { invalidateProjectListCache } from "@/features/submissions/project-list";
 import { resetDraftControllerForAccountChange } from "@/features/submissions/submission-draft";
 
+import { resetMentorQueueCache } from "@/features/reviews/mentor-queue-store";
+
 import type { AuthUser } from "./types";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
@@ -33,8 +35,18 @@ type SessionSnapshot = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 let sessionSnapshot: SessionSnapshot = { status: "loading", user: null };
+const SERVER_SNAPSHOT = sessionSnapshot;
+let sessionRequestSequence = 0;
 let sessionPromise: Promise<void> | null = null;
 const sessionListeners = new Set<() => void>();
+
+function handleSessionExpired() {
+  sessionRequestSequence += 1;
+  writeSession({ status: "anonymous", user: null });
+  invalidateProjectListCache();
+  resetMentorQueueCache();
+  resetDraftControllerForAccountChange();
+}
 
 function emitSession() {
   for (const listener of sessionListeners) {
@@ -43,9 +55,16 @@ function emitSession() {
 }
 
 function subscribeSession(listener: () => void) {
+  if (sessionListeners.size === 0) {
+    window.addEventListener("reviewdock:session-expired", handleSessionExpired);
+  }
   sessionListeners.add(listener);
+  void ensureSessionLoaded();
   return () => {
     sessionListeners.delete(listener);
+    if (sessionListeners.size === 0) {
+      window.removeEventListener("reviewdock:session-expired", handleSessionExpired);
+    }
   };
 }
 
@@ -54,7 +73,7 @@ function getSessionSnapshot() {
 }
 
 function getServerSessionSnapshot(): SessionSnapshot {
-  return { status: "loading", user: null };
+  return SERVER_SNAPSHOT;
 }
 
 function writeSession(next: SessionSnapshot) {
@@ -63,13 +82,16 @@ function writeSession(next: SessionSnapshot) {
 }
 
 async function loadSession(): Promise<void> {
+  const sequence = ++sessionRequestSequence;
   try {
     const data = await apiFetch<{ user: AuthUser }>("/api/auth/me", {
       method: "GET",
       cache: "no-store",
     });
+    if (sequence !== sessionRequestSequence) return;
     writeSession({ status: "authenticated", user: data.user });
   } catch (error) {
+    if (sequence !== sessionRequestSequence) return;
     writeSession({ status: "anonymous", user: null });
     if (!(error instanceof ApiError && error.status === 401)) {
       console.error(error);
@@ -90,10 +112,7 @@ function ensureSessionLoaded(): Promise<void> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const snapshot = useSyncExternalStore(
     subscribeSession,
-    () => {
-      void ensureSessionLoaded();
-      return getSessionSnapshot();
-    },
+    getSessionSnapshot,
     getServerSessionSnapshot,
   );
 
@@ -103,7 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setUser = useCallback((next: AuthUser | null) => {
+    sessionRequestSequence += 1;
     invalidateProjectListCache();
+    resetMentorQueueCache();
     resetDraftControllerForAccountChange();
     writeSession({
       status: next ? "authenticated" : "anonymous",
@@ -112,12 +133,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    try {
-      await apiFetch<void>("/api/auth/logout", { method: "POST" });
-    } catch {
-      // Still clear local session state if the cookie is already gone.
-    }
+    // Only claim logout after Express has cleared the HttpOnly browser cookie.
+    await apiFetch<void>("/api/auth/logout", { method: "POST" });
+    sessionRequestSequence += 1;
     invalidateProjectListCache();
+    resetMentorQueueCache();
     resetDraftControllerForAccountChange();
     writeSession({ status: "anonymous", user: null });
   }, []);

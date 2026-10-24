@@ -6,3 +6,8 @@ package-lock.json
 next-env.d.ts
 *.tsbuildinfo
 apps/api/src/generated
+test-results
+playwright-report
+blob-report
+e2e/.runtime
+e2e/.auth

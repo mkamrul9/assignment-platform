@@ -50,6 +50,9 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     : null;
 
   if (!response.ok) {
+    if (response.status === 401 && path !== "/api/auth/login" && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("reviewdock:session-expired"));
+    }
     const error = (payload as ApiErrorBody | null)?.error;
     throw new ApiError(
       response.status,

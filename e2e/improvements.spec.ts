@@ -1,19 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import {
-  e2eState,
-  login,
-  logout,
-  mentorLogin,
-  signupStudent,
-  submitProject,
-  uniqueEmail,
-} from "./helpers";
+import { login, logout, mentorLogin, signupStudent, uniqueEmail } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
 test("drafts, search URL state, checkpoints, and stats stability", async ({ browser, page }) => {
-  const state = e2eState();
   const stamp = Date.now();
   const password = "student-pass-1";
   const studentAEmail = uniqueEmail("draft-a");

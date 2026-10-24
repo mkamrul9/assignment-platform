@@ -1,23 +1,8 @@
 import { Prisma, Role } from "../../generated/prisma/client.js";
 import { hashPassword, verifyPassword } from "../../lib/password.js";
 import { prisma } from "../../lib/prisma.js";
+import { publicUserSelect, type PublicUser } from "../../lib/public-user.js";
 import type { LoginInput, SignupInput } from "./auth.schemas.js";
-
-export const publicUserSelect = {
-  id: true,
-  name: true,
-  email: true,
-  role: true,
-  createdAt: true,
-} as const;
-
-export type PublicUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  createdAt: Date;
-};
 
 export class AuthConflictError extends Error {
   constructor(message = "An account with this email already exists.") {

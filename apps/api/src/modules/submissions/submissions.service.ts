@@ -1,8 +1,4 @@
-import {
-  Prisma,
-  type ReviewDecision,
-  type SubmissionStatus,
-} from "../../generated/prisma/client.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import { canonicalizeRepositoryUrl } from "../../lib/canonical-repository-url.js";
 import { prisma } from "../../lib/prisma.js";
 import type { CreateSubmissionInput } from "./submissions.schemas.js";
@@ -29,25 +25,9 @@ export const submissionSelect = {
   },
 } as const;
 
-export type SubmissionView = {
-  id: string;
-  projectName: string;
-  repositoryUrl: string;
-  canonicalRepositoryUrl: string;
-  liveUrl: string;
-  description: string;
-  status: SubmissionStatus;
-  createdAt: Date;
-  updatedAt: Date;
-  review: {
-    decision: ReviewDecision;
-    note: string | null;
-    functionality: string;
-    usability: string;
-    documentation: string;
-    reviewedAt: Date;
-  } | null;
-};
+export type SubmissionView = Prisma.SubmissionGetPayload<{
+  select: typeof submissionSelect;
+}>;
 
 export class SubmissionConflictError extends Error {
   constructor(message = "A project with this repository URL has already been submitted.") {

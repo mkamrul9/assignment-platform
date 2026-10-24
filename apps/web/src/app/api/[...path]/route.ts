@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { buildUpstreamHeaders } from "@/lib/api-proxy-headers";
+import { fetchApiUpstream } from "@/lib/api-upstream";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,13 +35,14 @@ async function proxyRequest(request: NextRequest, path: string[]) {
     headers,
     redirect: "manual",
     cache: "no-store",
+    signal: request.signal,
   };
 
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = await request.arrayBuffer();
   }
 
-  const upstream = await fetch(target, init);
+  const upstream = await fetchApiUpstream(target, init);
   const responseHeaders = new Headers();
   for (const [name, value] of upstream.headers.entries()) {
     if (name.toLowerCase() === "set-cookie") {

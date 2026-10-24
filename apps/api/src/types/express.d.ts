@@ -1,17 +1,9 @@
-import type { Role } from "../generated/prisma/client.js";
-
-export type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  createdAt: Date;
-};
+import type { PublicUser } from "../lib/public-user.js";
 
 declare global {
   namespace Express {
     interface Request {
-      user?: AuthUser;
+      user?: PublicUser;
     }
   }
 }

@@ -162,7 +162,7 @@ async function requestJson(
   };
 }
 
-async function main() {
+async function runChecks() {
   const testUrl = await resetTestDatabase(DEV_DATABASE_URL, TEST_DATABASE_NAME);
   migrateDeploy(testUrl);
 
@@ -378,7 +378,9 @@ async function main() {
       .sign(secret);
     assert((await cookieForToken(wrongAudience)).status === 401, "wrong audience must be 401");
 
-    const tamperedParts = parseSetCookie(login.setCookie).value.split(".");
+    const loginToken = parseSetCookie(login.setCookie).value;
+    assert(loginToken, "login must set a token before testing tampering");
+    const tamperedParts = loginToken.split(".");
     tamperedParts[2] = "invalidsignature";
     assert(
       (await cookieForToken(tamperedParts.join("."))).status === 401,
@@ -522,6 +524,14 @@ async function main() {
       rate.server.close((error) => (error ? reject(error) : resolve()));
     });
     await prisma.$disconnect();
+  }
+}
+
+async function main() {
+  // Cleanup also covers migration/import failures and failures before the limiter phase.
+  try {
+    await runChecks();
+  } finally {
     await dropTestDatabase(DEV_DATABASE_URL, TEST_DATABASE_NAME);
   }
 }

@@ -170,6 +170,7 @@ type QueueBody = {
   submissions: Array<{
     id: string;
     projectName: string;
+    repositoryUrl: string;
     status: string;
     createdAt: string;
     owner: { id: string; name: string; email: string };
@@ -197,7 +198,7 @@ type StatsBody = {
   stats: { pending: number; approved: number; rejected: number; total: number };
 };
 
-async function main() {
+async function runChecks() {
   const testUrl = await resetTestDatabase(DEV_DATABASE_URL, TEST_DATABASE_NAME);
   migrateDeploy(testUrl);
 
@@ -909,6 +910,14 @@ async function main() {
       server.close((error) => (error ? reject(error) : resolve()));
     });
     await prisma.$disconnect();
+  }
+}
+
+async function main() {
+  // Cleanup also covers migration/import failures and failures before the limiter phase.
+  try {
+    await runChecks();
+  } finally {
     await dropTestDatabase(DEV_DATABASE_URL, TEST_DATABASE_NAME);
   }
 }

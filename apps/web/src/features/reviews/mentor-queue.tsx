@@ -1,27 +1,37 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
 
+import type { CheckpointFieldKey } from "./checkpoint-labels";
 import {
-  CHECKPOINT_FIELDS,
-  CHECKPOINT_OPTIONS,
-  checkpointLabel,
-  type CheckpointFieldKey,
-} from "./checkpoint-labels";
+  ensureStats,
+  ensureQueue,
+  subscribe,
+  getSnapshot,
+  getServerSnapshot,
+  requestStats,
+  requestQueue,
+  write,
+} from "./mentor-queue-store";
+import {
+  buildQueueSearchParams,
+  queryKeyOf,
+  parseStatus,
+  parsePage,
+  parsePageSize,
+  parseSearch,
+  SEARCH_MAX,
+  SEARCH_DEBOUNCE_MS,
+  PAGE_SIZES,
+} from "./queue-query";
+import { formatDate, statusLabel } from "./presentation";
+import { ReviewDialog } from "./review-dialog";
 import type {
   CheckpointAssessment,
   PaginationMeta,
@@ -32,299 +42,11 @@ import type {
   ReviewStats,
 } from "./types";
 
-type LoadStatus = "loading" | "ready" | "error";
-
-type StatsSlice = {
-  status: LoadStatus;
-  stats: ReviewStats;
-  errorMessage: string | null;
-};
-
-type QueueSlice = {
-  status: LoadStatus;
-  submissions: QueueSubmission[];
-  pagination: PaginationMeta | null;
-  errorMessage: string | null;
-  queryKey: string;
-};
-
-type StoreState = {
-  stats: StatsSlice;
-  queue: QueueSlice;
-};
-
-const emptyStats: ReviewStats = { pending: 0, approved: 0, rejected: 0, total: 0 };
-const SEARCH_MAX = 100;
-const SEARCH_DEBOUNCE_MS = 350;
-const PAGE_SIZES = [10, 20, 50] as const;
-
 const DEFAULT_CHECKPOINTS: ReviewCheckpoints = {
   functionality: "NOT_ASSESSED",
   usability: "NOT_ASSESSED",
   documentation: "NOT_ASSESSED",
 };
-
-let store: StoreState = {
-  stats: { status: "loading", stats: emptyStats, errorMessage: null },
-  queue: {
-    status: "loading",
-    submissions: [],
-    pagination: null,
-    errorMessage: null,
-    queryKey: "",
-  },
-};
-
-let statsPromise: Promise<void> | null = null;
-let queuePromise: Promise<void> | null = null;
-let queueRequestSeq = 0;
-const listeners = new Set<() => void>();
-
-function emit() {
-  for (const listener of listeners) {
-    listener();
-  }
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function getSnapshot() {
-  return store;
-}
-
-function getServerSnapshot(): StoreState {
-  return {
-    stats: { status: "loading", stats: emptyStats, errorMessage: null },
-    queue: {
-      status: "loading",
-      submissions: [],
-      pagination: null,
-      errorMessage: null,
-      queryKey: "",
-    },
-  };
-}
-
-function write(next: StoreState) {
-  store = next;
-  emit();
-}
-
-function queryKeyOf(page: number, pageSize: number, status: QueueStatusFilter, q: string) {
-  return `${status}|${page}|${pageSize}|${q}`;
-}
-
-function parseStatus(value: string | null): QueueStatusFilter {
-  if (value === "ALL" || value === "PENDING" || value === "APPROVED" || value === "REJECTED") {
-    return value;
-  }
-  return "PENDING";
-}
-
-function parsePage(value: string | null): number {
-  const n = Number(value);
-  return Number.isInteger(n) && n >= 1 ? n : 1;
-}
-
-function parsePageSize(value: string | null): number {
-  const n = Number(value);
-  return PAGE_SIZES.includes(n as (typeof PAGE_SIZES)[number]) ? n : 10;
-}
-
-function parseSearch(value: string | null): string {
-  if (!value) {
-    return "";
-  }
-  return value.trim().slice(0, SEARCH_MAX);
-}
-
-function buildQueueSearchParams(input: {
-  page: number;
-  pageSize: number;
-  status: QueueStatusFilter;
-  q: string;
-}): URLSearchParams {
-  const params = new URLSearchParams();
-  params.set("page", String(input.page));
-  params.set("pageSize", String(input.pageSize));
-  params.set("status", input.status);
-  if (input.q) {
-    params.set("q", input.q);
-  }
-  return params;
-}
-
-async function fetchStats(): Promise<void> {
-  write({
-    ...store,
-    stats: { status: "loading", stats: store.stats.stats, errorMessage: null },
-  });
-  try {
-    const data = await apiFetch<{ stats: ReviewStats }>("/api/reviews/stats", {
-      method: "GET",
-      cache: "no-store",
-    });
-    write({
-      ...store,
-      stats: { status: "ready", stats: data.stats, errorMessage: null },
-    });
-  } catch (error) {
-    write({
-      ...store,
-      stats: {
-        status: "error",
-        stats: store.stats.stats,
-        errorMessage: error instanceof ApiError ? error.message : "Unable to load statistics.",
-      },
-    });
-  }
-}
-
-async function fetchQueue(
-  page: number,
-  pageSize: number,
-  status: QueueStatusFilter,
-  q: string,
-): Promise<void> {
-  const key = queryKeyOf(page, pageSize, status, q);
-  const seq = ++queueRequestSeq;
-  write({
-    ...store,
-    queue: {
-      status: "loading",
-      submissions: store.queue.submissions,
-      pagination: store.queue.pagination,
-      errorMessage: null,
-      queryKey: key,
-    },
-  });
-
-  try {
-    const params = buildQueueSearchParams({ page, pageSize, status, q });
-    const data = await apiFetch<{
-      submissions: QueueSubmission[];
-      pagination: PaginationMeta;
-    }>(`/api/reviews/submissions?${params.toString()}`, {
-      method: "GET",
-      cache: "no-store",
-    });
-    if (seq !== queueRequestSeq) {
-      return;
-    }
-
-    let rows = data.submissions;
-    let meta = data.pagination;
-    let pageUsed = page;
-
-    if (rows.length === 0 && meta.total > 0 && meta.totalPages > 0 && page > meta.totalPages) {
-      pageUsed = meta.totalPages;
-      const retryParams = buildQueueSearchParams({ page: pageUsed, pageSize, status, q });
-      const retry = await apiFetch<{
-        submissions: QueueSubmission[];
-        pagination: PaginationMeta;
-      }>(`/api/reviews/submissions?${retryParams.toString()}`, {
-        method: "GET",
-        cache: "no-store",
-      });
-      if (seq !== queueRequestSeq) {
-        return;
-      }
-      rows = retry.submissions;
-      meta = retry.pagination;
-    }
-
-    write({
-      ...store,
-      queue: {
-        status: "ready",
-        submissions: rows,
-        pagination: meta,
-        errorMessage: null,
-        queryKey: queryKeyOf(pageUsed, pageSize, status, q),
-      },
-    });
-  } catch (error) {
-    if (seq !== queueRequestSeq) {
-      return;
-    }
-    write({
-      ...store,
-      queue: {
-        status: "error",
-        submissions: [],
-        pagination: null,
-        errorMessage: error instanceof ApiError ? error.message : "Unable to load the queue.",
-        queryKey: key,
-      },
-    });
-  }
-}
-
-function ensureStats(): Promise<void> {
-  if (typeof window === "undefined") {
-    return Promise.resolve();
-  }
-  if (!statsPromise) {
-    statsPromise = fetchStats();
-  }
-  return statsPromise;
-}
-
-function ensureQueue(
-  page: number,
-  pageSize: number,
-  status: QueueStatusFilter,
-  q: string,
-): Promise<void> {
-  if (typeof window === "undefined") {
-    return Promise.resolve();
-  }
-  const key = queryKeyOf(page, pageSize, status, q);
-  if (!queuePromise || store.queue.queryKey !== key) {
-    queuePromise = fetchQueue(page, pageSize, status, q);
-  }
-  return queuePromise;
-}
-
-function requestStats(): Promise<void> {
-  statsPromise = fetchStats();
-  return statsPromise;
-}
-
-function requestQueue(
-  page: number,
-  pageSize: number,
-  status: QueueStatusFilter,
-  q: string,
-): Promise<void> {
-  queuePromise = fetchQueue(page, pageSize, status, q);
-  return queuePromise;
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function statusLabel(status: QueueSubmission["status"]): string {
-  switch (status) {
-    case "PENDING":
-      return "Pending";
-    case "APPROVED":
-      return "Approved";
-    case "REJECTED":
-      return "Rejected";
-    default:
-      return status;
-  }
-}
 
 const FILTERS: Array<{ value: QueueStatusFilter; label: string }> = [
   { value: "PENDING", label: "Pending" },
@@ -358,15 +80,16 @@ export function MentorQueue() {
     setSearchInput(q);
   }
 
-  const state = useSyncExternalStore(
-    subscribe,
-    () => {
+  const subscribeToQueue = useCallback(
+    (listener: () => void) => {
+      const unsubscribe = subscribe(listener);
       void ensureStats();
       void ensureQueue(page, pageSize, filter, q);
-      return getSnapshot();
+      return unsubscribe;
     },
-    getServerSnapshot,
+    [page, pageSize, filter, q],
   );
+  const state = useSyncExternalStore(subscribeToQueue, getSnapshot, getServerSnapshot);
 
   const [selected, setSelected] = useState<QueueSubmission | null>(null);
   const [note, setNote] = useState("");
@@ -483,7 +206,7 @@ export function MentorQueue() {
       updated.status === "APPROVED" ? "Project approved." : "Project rejected with feedback.",
     );
     await Promise.all([requestStats(), requestQueue(page, pageSize, filter, q)]);
-    const recovered = store.queue.pagination?.page;
+    const recovered = getSnapshot().queue.pagination?.page;
     if (recovered && recovered !== page) {
       replaceQueueUrl({ page: recovered, pageSize, status: filter, q });
     }
@@ -576,10 +299,6 @@ export function MentorQueue() {
     } finally {
       setSaving(false);
     }
-  }
-
-  function onDialogSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
   }
 
   useEffect(() => {
@@ -817,187 +536,24 @@ export function MentorQueue() {
         ) : null}
       </section>
 
-      <dialog
-        ref={dialogRef}
-        aria-labelledby={dialogTitleId}
-        className="w-[min(100%,36rem)] max-h-[min(90vh,40rem)] overflow-y-auto rounded-xl border bg-card p-0 text-foreground shadow-lg backdrop:bg-foreground/40"
-        onClose={handleDialogClose}
-      >
-        {selected ? (
-          <form className="space-y-5 p-6" onSubmit={onDialogSubmit}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">
-                  {statusLabel(selected.status)}
-                </p>
-                <h3 id={dialogTitleId} className="mt-2 font-serif text-2xl tracking-tight">
-                  {selected.projectName}
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {selected.owner.name} · {selected.owner.email}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                data-dialog-initial-focus
-                onClick={closeDialog}
-              >
-                Close
-              </Button>
-            </div>
-
-            <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-              {selected.description}
-            </p>
-
-            <div className="flex flex-wrap gap-4 text-sm">
-              <a
-                href={selected.repositoryUrl}
-                className="font-medium text-primary underline-offset-4 hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Repository
-              </a>
-              <a
-                href={selected.liveUrl}
-                className="font-medium text-primary underline-offset-4 hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Live demo
-              </a>
-            </div>
-
-            {selected.review ? (
-              <div className="rounded-md border bg-background px-4 py-3 text-sm">
-                <p className="font-medium">
-                  Reviewed by {selected.review.mentor.name}:{" "}
-                  {selected.review.decision === "APPROVED" ? "Approved" : "Rejected"}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatDate(selected.review.reviewedAt)}
-                </p>
-                <dl className="mt-3 grid gap-2 sm:grid-cols-3">
-                  {CHECKPOINT_FIELDS.map((field) => (
-                    <div key={field.key}>
-                      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        {field.label}
-                      </dt>
-                      <dd className="mt-1">{checkpointLabel(selected.review![field.key])}</dd>
-                    </div>
-                  ))}
-                </dl>
-                {selected.review.note ? (
-                  <p className="mt-3 whitespace-pre-wrap leading-6 text-muted-foreground">
-                    {selected.review.note}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {selected.status === "PENDING" ? (
-              <div className="space-y-4">
-                <fieldset className="space-y-3">
-                  <legend className="text-sm font-medium">Checkpoints</legend>
-                  <p id={checkpointsHintId} className="text-xs text-muted-foreground">
-                    Optional checkpoints give students more specific feedback. Your approve or
-                    reject decision remains the overall outcome.
-                  </p>
-                  {CHECKPOINT_FIELDS.map((field) => (
-                    <div key={field.key} className="space-y-2">
-                      <Label htmlFor={`${field.key}-checkpoint`}>{field.label}</Label>
-                      <select
-                        id={`${field.key}-checkpoint`}
-                        className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        value={checkpoints[field.key]}
-                        disabled={saving}
-                        aria-describedby={checkpointsHintId}
-                        onChange={(event) =>
-                          setCheckpoint(field.key, event.target.value as CheckpointAssessment)
-                        }
-                      >
-                        {CHECKPOINT_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </fieldset>
-
-                <div className="space-y-2">
-                  <Label htmlFor={noteFieldId}>Review note</Label>
-                  <textarea
-                    id={noteFieldId}
-                    rows={4}
-                    value={note}
-                    onChange={(event) => setNote(event.target.value)}
-                    disabled={saving}
-                    aria-invalid={Boolean(noteError)}
-                    aria-describedby={noteError ? `${noteFieldId}-error` : `${noteFieldId}-hint`}
-                    className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive"
-                  />
-                  <p id={`${noteFieldId}-hint`} className="text-xs text-muted-foreground">
-                    Optional for approval. Required for rejection (10–1,000 characters). Use this
-                    for actionable improvement guidance.
-                  </p>
-                  {noteError ? (
-                    <p id={`${noteFieldId}-error`} className="text-sm text-destructive">
-                      {noteError}
-                    </p>
-                  ) : null}
-                </div>
-
-                {formError ? (
-                  <p className="text-sm text-destructive" role="alert">
-                    {formError}
-                  </p>
-                ) : null}
-                {successMessage ? (
-                  <p className="text-sm text-primary" role="status">
-                    {successMessage}
-                  </p>
-                ) : null}
-
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void submitDecision("APPROVED")}
-                  >
-                    {saving ? "Saving…" : "Approve"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    disabled={saving}
-                    onClick={() => void submitDecision("REJECTED")}
-                  >
-                    {saving ? "Saving…" : "Reject"}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                {formError ? (
-                  <p className="text-sm text-destructive" role="alert">
-                    {formError}
-                  </p>
-                ) : null}
-                {successMessage ? (
-                  <p className="text-sm text-primary" role="status">
-                    {successMessage}
-                  </p>
-                ) : null}
-              </>
-            )}
-          </form>
-        ) : null}
-      </dialog>
+      <ReviewDialog
+        dialogRef={dialogRef}
+        dialogTitleId={dialogTitleId}
+        noteFieldId={noteFieldId}
+        checkpointsHintId={checkpointsHintId}
+        selected={selected}
+        note={note}
+        checkpoints={checkpoints}
+        noteError={noteError}
+        formError={formError}
+        saving={saving}
+        successMessage={successMessage}
+        handleDialogClose={handleDialogClose}
+        closeDialog={closeDialog}
+        setNote={setNote}
+        setCheckpoint={setCheckpoint}
+        submitDecision={submitDecision}
+      />
     </div>
   );
 }

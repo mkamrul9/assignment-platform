@@ -1,6 +1,7 @@
 import { config as loadDotenv } from "dotenv";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
+import { normalizeEmail } from "../src/lib/email.js";
+import { assertPasswordPolicy, hashPassword } from "../src/lib/password.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -23,25 +24,12 @@ const seedEnvSchema = z.object({
     .min(1, "MENTOR_EMAIL is required.")
     .email("MENTOR_EMAIL must be a valid email address."),
   MENTOR_PASSWORD: z.string().superRefine((value, ctx) => {
-    if (value.length < 8) {
-      ctx.addIssue({
-        code: "custom",
-        message: "MENTOR_PASSWORD must be at least 8 characters.",
-      });
-      return;
-    }
-    if (Buffer.byteLength(value, "utf8") > 72) {
-      ctx.addIssue({
-        code: "custom",
-        message: "MENTOR_PASSWORD must be at most 72 bytes (bcrypt limit).",
-      });
+    const error = assertPasswordPolicy(value);
+    if (error) {
+      ctx.addIssue({ code: "custom", message: `MENTOR_PASSWORD: ${error}` });
     }
   }),
 });
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 async function main() {
   const parsed = seedEnvSchema.safeParse(process.env);
@@ -71,7 +59,7 @@ async function main() {
       return;
     }
 
-    const passwordHash = await bcrypt.hash(MENTOR_PASSWORD, 12);
+    const passwordHash = await hashPassword(MENTOR_PASSWORD);
 
     await prisma.user.create({
       data: {

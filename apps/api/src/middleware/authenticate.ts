@@ -4,15 +4,7 @@ import { env } from "../config/env.js";
 import { JoseErrors, verifySessionToken } from "../lib/jwt.js";
 import { sendError } from "../lib/http.js";
 import { prisma } from "../lib/prisma.js";
-import type { AuthUser } from "../types/express.js";
-
-const publicUserSelect = {
-  id: true,
-  name: true,
-  email: true,
-  role: true,
-  createdAt: true,
-} as const;
+import { publicUserSelect } from "../lib/public-user.js";
 
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const token = req.cookies?.[env.SESSION_COOKIE_NAME];
@@ -33,7 +25,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    req.user = user as AuthUser;
+    req.user = user;
     next();
   } catch (error) {
     if (

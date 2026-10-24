@@ -20,6 +20,8 @@ let listState: ListState = {
   submissions: [],
   errorMessage: null,
 };
+const SERVER_SNAPSHOT = listState;
+let requestSequence = 0;
 let listPromise: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
@@ -31,6 +33,7 @@ function emit() {
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
+  void ensureLoaded();
   return () => {
     listeners.delete(listener);
   };
@@ -41,7 +44,7 @@ function getSnapshot() {
 }
 
 function getServerSnapshot(): ListState {
-  return { status: "loading", submissions: [], errorMessage: null };
+  return SERVER_SNAPSHOT;
 }
 
 function write(next: ListState) {
@@ -50,14 +53,17 @@ function write(next: ListState) {
 }
 
 async function fetchProjects(): Promise<void> {
+  const sequence = ++requestSequence;
   write({ status: "loading", submissions: listState.submissions, errorMessage: null });
   try {
     const data = await apiFetch<{ submissions: Submission[] }>("/api/submissions/mine", {
       method: "GET",
       cache: "no-store",
     });
+    if (sequence !== requestSequence) return;
     write({ status: "ready", submissions: data.submissions, errorMessage: null });
   } catch (error) {
+    if (sequence !== requestSequence) return;
     write({
       status: "error",
       submissions: [],
@@ -97,14 +103,7 @@ function statusLabel(status: Submission["status"]): string {
 }
 
 export function ProjectList() {
-  const state = useSyncExternalStore(
-    subscribe,
-    () => {
-      void ensureLoaded();
-      return getSnapshot();
-    },
-    getServerSnapshot,
-  );
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const reload = useCallback(() => {
     listPromise = fetchProjects();
@@ -214,6 +213,7 @@ export function ProjectList() {
 
 /** Reset cached list state after a successful submission from another page. */
 export function invalidateProjectListCache() {
+  requestSequence += 1;
   listPromise = null;
   write({ status: "loading", submissions: [], errorMessage: null });
 }
