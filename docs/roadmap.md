@@ -157,9 +157,18 @@ Commit: `feat: add isolated opt-in demo sandbox`
 
 Commit: `feat: add bounded student project browsing and details`
 
+### U5: Mentor workspace usability and review recovery
+
+- [x] Keep compact server-paginated queue rows; load full description/review via U4 `GET /api/submissions/:id` when opening a project.
+- [x] Add manual refresh and clear-filters controls; preserve URL-backed search/status/page/pageSize and global stats independence.
+- [x] Harden the review dialog for detail loading/retry, stale-response protection, 409 conflict recovery from the detail API, and save-success vs refresh-failure messaging.
+- [x] Preserve keyboard focus containment/restoration (with a useful fallback when the trigger row leaves the queue).
+- [x] Verify: `check`, `build`, `auth:check`, `submissions:check`, `reviews:check`, `test:e2e` (20 Chromium tests including mentor workspace recovery).
+
+Commit: `feat: refine mentor review details and conflict recovery`
+
 ### Remaining upgrade phases
 
-- [ ] U5: Refine mentor detail loading, review recovery, and workspace usability.
 - [ ] U6: Measure performance and run complete correctness/accessibility regression verification.
 - [ ] U7: Finish final documentation and authorized, evidenced delivery.
 

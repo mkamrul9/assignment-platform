@@ -12,6 +12,8 @@ import {
 import { formatDate, statusLabel } from "./presentation";
 import type {
   CheckpointAssessment,
+  DetailLoadStatus,
+  QueueListItem,
   QueueSubmission,
   ReviewCheckpoints,
   ReviewDecision,
@@ -22,15 +24,20 @@ type ReviewDialogProps = {
   dialogTitleId: string;
   noteFieldId: string;
   checkpointsHintId: string;
-  selected: QueueSubmission | null;
+  listRow: QueueListItem | null;
+  detail: QueueSubmission | null;
+  detailStatus: DetailLoadStatus;
+  detailError: string | null;
   note: string;
   checkpoints: ReviewCheckpoints;
   noteError: string | null;
   formError: string | null;
+  refreshError: string | null;
   saving: boolean;
   successMessage: string | null;
   handleDialogClose: () => void;
   closeDialog: () => void;
+  retryDetail: () => void;
   setNote: (note: string) => void;
   setCheckpoint: (field: CheckpointFieldKey, value: CheckpointAssessment) => void;
   submitDecision: (decision: ReviewDecision) => Promise<void>;
@@ -42,19 +49,33 @@ export function ReviewDialog({
   dialogTitleId,
   noteFieldId,
   checkpointsHintId,
-  selected,
+  listRow,
+  detail,
+  detailStatus,
+  detailError,
   note,
   checkpoints,
   noteError,
   formError,
+  refreshError,
   saving,
   successMessage,
   handleDialogClose,
   closeDialog,
+  retryDetail,
   setNote,
   setCheckpoint,
   submitDecision,
 }: ReviewDialogProps) {
+  const heading = detail?.projectName ?? listRow?.projectName ?? "Project";
+  const ownerLine = detail
+    ? `${detail.owner.name} · ${detail.owner.email}`
+    : listRow
+      ? `${listRow.owner.name} · ${listRow.owner.email}`
+      : null;
+  const status = detail?.status ?? listRow?.status;
+  const showDecisionControls = detailStatus === "ready" && detail?.status === "PENDING";
+
   return (
     <dialog
       ref={dialogRef}
@@ -62,22 +83,24 @@ export function ReviewDialog({
       className="w-[min(100%,36rem)] max-h-[min(90vh,40rem)] overflow-y-auto rounded-xl border bg-card p-0 text-foreground shadow-lg backdrop:bg-foreground/40"
       onClose={handleDialogClose}
     >
-      {selected ? (
+      {listRow || detail ? (
         <form className="space-y-5 p-6" onSubmit={(event) => event.preventDefault()}>
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold tracking-wide text-primary uppercase">
-                {statusLabel(selected.status)}
-              </p>
+            <div className="min-w-0">
+              {status ? (
+                <p className="text-xs font-semibold tracking-wide text-primary uppercase">
+                  {statusLabel(status)}
+                </p>
+              ) : null}
               <h3
                 id={dialogTitleId}
                 className="mt-2 break-words text-2xl font-semibold tracking-tight"
               >
-                {selected.projectName}
+                {heading}
               </h3>
-              <p className="mt-1 break-words text-sm text-muted-foreground">
-                {selected.owner.name} · {selected.owner.email}
-              </p>
+              {ownerLine ? (
+                <p className="mt-1 break-words text-sm text-muted-foreground">{ownerLine}</p>
+              ) : null}
             </div>
             <Button
               type="button"
@@ -90,57 +113,82 @@ export function ReviewDialog({
             </Button>
           </div>
 
-          <p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
-            {selected.description}
-          </p>
+          {detailStatus === "loading" ? (
+            <p className="text-sm text-muted-foreground">Loading project details…</p>
+          ) : null}
 
-          <div className="flex flex-wrap gap-4 text-sm">
-            <a
-              href={selected.repositoryUrl}
-              className="font-medium text-primary underline-offset-4 hover:underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Repository
-            </a>
-            <a
-              href={selected.liveUrl}
-              className="font-medium text-primary underline-offset-4 hover:underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Live demo
-            </a>
-          </div>
-
-          {selected.review ? (
-            <div className="rounded-md border bg-background px-4 py-3 text-sm">
-              <p className="font-medium">
-                Reviewed by {selected.review.mentor.name}:{" "}
-                {selected.review.decision === "APPROVED" ? "Approved" : "Rejected"}
+          {detailStatus === "error" ? (
+            <div className="space-y-3 rounded-md border border-destructive/30 bg-background px-4 py-3">
+              <p className="text-sm text-destructive" role="alert">
+                {detailError ?? "Unable to load project details."}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {formatDate(selected.review.reviewedAt)}
-              </p>
-              <dl className="mt-3 grid gap-2 sm:grid-cols-3">
-                {CHECKPOINT_FIELDS.map((field) => (
-                  <div key={field.key}>
-                    <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                      {field.label}
-                    </dt>
-                    <dd className="mt-1">{checkpointLabel(selected.review![field.key])}</dd>
-                  </div>
-                ))}
-              </dl>
-              {selected.review.note ? (
-                <p className="mt-3 whitespace-pre-wrap leading-6 text-muted-foreground">
-                  {selected.review.note}
-                </p>
-              ) : null}
+              <Button type="button" variant="outline" size="sm" onClick={retryDetail}>
+                Try again
+              </Button>
             </div>
           ) : null}
 
-          {selected.status === "PENDING" ? (
+          {detailStatus === "missing" ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              This project is no longer available.
+            </p>
+          ) : null}
+
+          {detailStatus === "ready" && detail ? (
+            <>
+              <p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
+                {detail.description}
+              </p>
+
+              <div className="flex flex-wrap gap-4 text-sm">
+                <a
+                  href={detail.repositoryUrl}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Repository
+                </a>
+                <a
+                  href={detail.liveUrl}
+                  className="font-medium text-primary underline-offset-4 hover:underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Live demo
+                </a>
+              </div>
+
+              {detail.review ? (
+                <div className="rounded-md border bg-background px-4 py-3 text-sm">
+                  <p className="font-medium">
+                    Reviewed by {detail.review.mentor.name}:{" "}
+                    {detail.review.decision === "APPROVED" ? "Approved" : "Rejected"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatDate(detail.review.reviewedAt)}
+                  </p>
+                  <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+                    {CHECKPOINT_FIELDS.map((field) => (
+                      <div key={field.key}>
+                        <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                          {field.label}
+                        </dt>
+                        <dd className="mt-1">{checkpointLabel(detail.review![field.key])}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {detail.review.note ? (
+                    <p className="mt-3 whitespace-pre-wrap leading-6 text-muted-foreground">
+                      {detail.review.note}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {showDecisionControls ? (
             <div className="space-y-4">
               <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">Checkpoints</legend>
@@ -204,6 +252,11 @@ export function ReviewDialog({
                   {successMessage}
                 </p>
               ) : null}
+              {refreshError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {refreshError}
+                </p>
+              ) : null}
 
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -233,6 +286,11 @@ export function ReviewDialog({
               {successMessage ? (
                 <p className="text-sm text-primary" role="status">
                   {successMessage}
+                </p>
+              ) : null}
+              {refreshError ? (
+                <p className="text-sm text-destructive" role="alert">
+                  {refreshError}
                 </p>
               ) : null}
             </>

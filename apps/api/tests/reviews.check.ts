@@ -171,18 +171,12 @@ type QueueBody = {
     id: string;
     projectName: string;
     repositoryUrl: string;
+    liveUrl: string;
     status: string;
     createdAt: string;
     owner: { id: string; name: string; email: string };
-    review: {
-      decision: string;
-      note: string | null;
-      functionality: string;
-      usability: string;
-      documentation: string;
-      reviewedAt: string;
-      mentor: { id: string; name: string };
-    } | null;
+    description?: string;
+    review?: unknown;
   }>;
   pagination: {
     page: number;
@@ -360,6 +354,12 @@ async function runChecks() {
     assert(
       defaultsBody.submissions.every((item) => item.status === "PENDING"),
       "default filter must be pending only",
+    );
+    assert(
+      defaultsBody.submissions.every(
+        (item) => item.description === undefined && item.review === undefined,
+      ),
+      "queue rows must omit full description/review payloads",
     );
 
     // Query validation
@@ -787,16 +787,38 @@ async function runChecks() {
     assert(legacyList.status === 200, "legacy list expected 200");
     const legacyRows = (legacyList.body as QueueBody).submissions;
     assert(legacyRows.length >= 1, "expected legacy rejected rows");
+    const legacyDetail = await requestJson(
+      baseUrl,
+      "GET",
+      `/api/submissions/${legacyRows[0]!.id}`,
+      { cookie: mentorA.cookie },
+    );
+    assert(legacyDetail.status === 200, "legacy detail expected 200");
+    assert(legacyDetail.headers.get("cache-control")?.includes("no-store"), "detail no-store");
+    const legacySubmission = (
+      legacyDetail.body as {
+        submission: {
+          description: string;
+          owner: { name: string };
+          review: {
+            functionality: string;
+            usability: string;
+            documentation: string;
+            mentor: { name: string };
+          } | null;
+        };
+      }
+    ).submission;
+    assert(legacySubmission.description.length > 0, "mentor detail includes description");
+    assert(Boolean(legacySubmission.owner?.name), "mentor detail includes owner");
     assert(
-      legacyRows.every(
-        (row) =>
-          row.review &&
-          row.review.functionality === "NOT_ASSESSED" &&
-          row.review.usability === "NOT_ASSESSED" &&
-          row.review.documentation === "NOT_ASSESSED",
-      ),
+      legacySubmission.review &&
+        legacySubmission.review.functionality === "NOT_ASSESSED" &&
+        legacySubmission.review.usability === "NOT_ASSESSED" &&
+        legacySubmission.review.documentation === "NOT_ASSESSED",
       "legacy reviews must display as unassessed",
     );
+    assert(Boolean(legacySubmission.review?.mentor?.name), "mentor detail includes reviewer");
 
     // Search combines with status; pagination/count apply; global stats stay independent.
     const statsBeforeSearch = await requestJson(baseUrl, "GET", "/api/reviews/stats", {

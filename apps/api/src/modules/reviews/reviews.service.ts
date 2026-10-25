@@ -7,6 +7,24 @@ import {
 import { prisma } from "../../lib/prisma.js";
 import type { DecisionInput, QueueQuery } from "./reviews.schemas.js";
 
+/** Compact queue rows: identity, status, links, and time — not full descriptions/reviews. */
+export const queueListSelect = {
+  id: true,
+  projectName: true,
+  repositoryUrl: true,
+  liveUrl: true,
+  status: true,
+  createdAt: true,
+  owner: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+} as const;
+
+/** Full project + review payload used by decision responses and mentor detail views. */
 export const queueSubmissionSelect = {
   id: true,
   projectName: true,
@@ -41,6 +59,10 @@ export const queueSubmissionSelect = {
     },
   },
 } as const;
+
+export type QueueListItem = Prisma.SubmissionGetPayload<{
+  select: typeof queueListSelect;
+}>;
 
 export type QueueSubmission = Prisma.SubmissionGetPayload<{
   select: typeof queueSubmissionSelect;
@@ -104,7 +126,7 @@ function queueWhere(query: QueueQuery): Prisma.SubmissionWhereInput {
 }
 
 export async function listReviewQueue(query: QueueQuery): Promise<{
-  submissions: QueueSubmission[];
+  submissions: QueueListItem[];
   pagination: PaginationMeta;
 }> {
   const where = queueWhere(query);
@@ -121,7 +143,7 @@ export async function listReviewQueue(query: QueueQuery): Promise<{
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           skip,
           take: query.pageSize,
-          select: queueSubmissionSelect,
+          select: queueListSelect,
         });
 
   return {

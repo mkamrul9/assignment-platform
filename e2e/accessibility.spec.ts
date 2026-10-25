@@ -127,9 +127,10 @@ test("keyboard, dialog focus, mobile layout, and failure recovery", async ({ bro
   await conflictDialog.getByLabel(/review note/i).fill("Stale dialog note that should remain.");
   await conflictDialog.getByRole("button", { name: /^approve$/i }).click();
   await expect(conflictDialog.getByRole("alert")).toContainText(/already been reviewed|already/i);
-  await expect(conflictDialog.getByLabel(/review note/i)).toHaveValue(
-    /Stale dialog note|Won the race/i,
-  );
+  // Decision controls are removed; winning review is loaded independently of the PENDING filter.
+  await expect(conflictDialog.getByRole("button", { name: /^approve$/i })).toHaveCount(0);
+  await expect(conflictDialog.getByText(/won the race from the api helper/i)).toBeVisible();
+  await expect(conflictDialog.getByText(/reviewed by/i)).toBeVisible();
 
   await mentor.context.close();
 

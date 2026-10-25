@@ -17,11 +17,9 @@ import {
   getServerSnapshot,
   requestStats,
   requestQueue,
-  write,
 } from "./mentor-queue-store";
 import {
   buildQueueSearchParams,
-  queryKeyOf,
   parseStatus,
   parsePage,
   parsePageSize,
@@ -34,12 +32,12 @@ import { formatDate, statusLabel } from "./presentation";
 import { ReviewDialog } from "./review-dialog";
 import type {
   CheckpointAssessment,
-  PaginationMeta,
+  DetailLoadStatus,
+  QueueListItem,
   QueueStatusFilter,
   QueueSubmission,
   ReviewCheckpoints,
   ReviewDecision,
-  ReviewStats,
 } from "./types";
 
 const DEFAULT_CHECKPOINTS: ReviewCheckpoints = {
@@ -63,6 +61,7 @@ export function MentorQueue() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detailRequestSeq = useRef(0);
   const noteFieldId = useId();
   const searchFieldId = useId();
   const dialogTitleId = useId();
@@ -91,13 +90,18 @@ export function MentorQueue() {
   );
   const state = useSyncExternalStore(subscribeToQueue, getSnapshot, getServerSnapshot);
 
-  const [selected, setSelected] = useState<QueueSubmission | null>(null);
+  const [listRow, setListRow] = useState<QueueListItem | null>(null);
+  const [detail, setDetail] = useState<QueueSubmission | null>(null);
+  const [detailStatus, setDetailStatus] = useState<DetailLoadStatus>("idle");
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [checkpoints, setCheckpoints] = useState<ReviewCheckpoints>(DEFAULT_CHECKPOINTS);
   const [noteError, setNoteError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const replaceQueueUrl = useCallback(
     (next: { page: number; pageSize: number; status: QueueStatusFilter; q: string }) => {
@@ -127,21 +131,54 @@ export function MentorQueue() {
     }
   }, [state.queue.status, state.queue.pagination, page, pageSize, filter, q, replaceQueueUrl]);
 
-  function openDialog(submission: QueueSubmission, trigger?: HTMLElement | null) {
+  async function loadDetail(submissionId: string, seq: number) {
+    setDetailStatus("loading");
+    setDetailError(null);
+    // Drop any previous project's body immediately so titles never mismatch descriptions.
+    setDetail(null);
+    try {
+      const data = await apiFetch<{ submission: QueueSubmission }>(
+        `/api/submissions/${submissionId}`,
+        { method: "GET", cache: "no-store" },
+      );
+      if (seq !== detailRequestSeq.current) {
+        return;
+      }
+      setDetail(data.submission);
+      setDetailStatus("ready");
+      setNote(data.submission.review?.note ?? "");
+      setCheckpoints(
+        data.submission.review
+          ? {
+              functionality: data.submission.review.functionality,
+              usability: data.submission.review.usability,
+              documentation: data.submission.review.documentation,
+            }
+          : { ...DEFAULT_CHECKPOINTS },
+      );
+    } catch (error) {
+      if (seq !== detailRequestSeq.current) {
+        return;
+      }
+      if (error instanceof ApiError && error.status === 404) {
+        setDetailStatus("missing");
+        setDetailError(null);
+        return;
+      }
+      setDetailStatus("error");
+      setDetailError(error instanceof ApiError ? error.message : "Unable to load project details.");
+    }
+  }
+
+  function openDialog(submission: QueueListItem, trigger?: HTMLElement | null) {
     triggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
-    setSelected(submission);
-    setNote(submission.review?.note ?? "");
-    setCheckpoints(
-      submission.review
-        ? {
-            functionality: submission.review.functionality,
-            usability: submission.review.usability,
-            documentation: submission.review.documentation,
-          }
-        : { ...DEFAULT_CHECKPOINTS },
-    );
+    const seq = ++detailRequestSeq.current;
+    setListRow(submission);
+    setNote("");
+    setCheckpoints({ ...DEFAULT_CHECKPOINTS });
     setNoteError(null);
     setFormError(null);
+    setRefreshError(null);
     setSuccessMessage(null);
     const dialog = dialogRef.current;
     dialog?.showModal();
@@ -149,6 +186,7 @@ export function MentorQueue() {
       const initial = dialog?.querySelector<HTMLElement>("[data-dialog-initial-focus]");
       initial?.focus();
     });
+    void loadDetail(submission.id, seq);
   }
 
   function closeDialog() {
@@ -156,11 +194,45 @@ export function MentorQueue() {
   }
 
   function handleDialogClose() {
+    detailRequestSeq.current += 1;
     const trigger = triggerRef.current;
     triggerRef.current = null;
-    setSelected(null);
+    setListRow(null);
+    setDetail(null);
+    setDetailStatus("idle");
+    setDetailError(null);
     setSaving(false);
-    trigger?.focus?.();
+    setRefreshError(null);
+    // Defer restoration so we do not steal focus if the caller already moved it
+    // (for example after Close, tests or other UI may focus another control).
+    window.setTimeout(() => {
+      const active = document.activeElement;
+      if (
+        active &&
+        active !== document.body &&
+        active !== document.documentElement &&
+        active.getAttribute("aria-hidden") !== "true"
+      ) {
+        return;
+      }
+      if (trigger && document.contains(trigger)) {
+        trigger.focus();
+        return;
+      }
+      const fallback =
+        document.querySelector<HTMLElement>("[data-queue-focus-fallback]") ??
+        document.querySelector<HTMLElement>('button[data-queue-action="review"]') ??
+        document.getElementById(searchFieldId);
+      fallback?.focus();
+    }, 0);
+  }
+
+  function retryDetail() {
+    if (!listRow) {
+      return;
+    }
+    const seq = ++detailRequestSeq.current;
+    void loadDetail(listRow.id, seq);
   }
 
   function changeFilter(next: QueueStatusFilter) {
@@ -203,12 +275,44 @@ export function MentorQueue() {
     applySearch("");
   }
 
+  function clearFilters() {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    setSearchInput("");
+    replaceQueueUrl({ page: 1, pageSize, status: "PENDING", q: "" });
+    void requestQueue(1, pageSize, "PENDING", "");
+  }
+
+  async function refreshWorkspace() {
+    setRefreshing(true);
+    try {
+      await Promise.all([requestStats(), requestQueue(page, pageSize, filter, q)]);
+      const recovered = getSnapshot().queue.pagination?.page;
+      if (recovered && recovered !== page) {
+        replaceQueueUrl({ page: recovered, pageSize, status: filter, q });
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   function setCheckpoint(key: CheckpointFieldKey, value: CheckpointAssessment) {
     setCheckpoints((prev) => ({ ...prev, [key]: value }));
   }
 
   async function refreshAfterDecision(updated: QueueSubmission) {
-    setSelected(updated);
+    setDetail(updated);
+    setDetailStatus("ready");
+    setListRow((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: updated.status,
+            projectName: updated.projectName,
+          }
+        : prev,
+    );
     setCheckpoints({
       functionality: updated.review?.functionality ?? "NOT_ASSESSED",
       usability: updated.review?.usability ?? "NOT_ASSESSED",
@@ -217,7 +321,60 @@ export function MentorQueue() {
     setSuccessMessage(
       updated.status === "APPROVED" ? "Project approved." : "Project rejected with feedback.",
     );
-    await Promise.all([requestStats(), requestQueue(page, pageSize, filter, q)]);
+    setRefreshError(null);
+    const [statsOk, queueOk] = await Promise.all([
+      requestStats(),
+      requestQueue(page, pageSize, filter, q),
+    ]);
+    if (!statsOk || !queueOk) {
+      setRefreshError(
+        "Decision saved, but the queue could not be refreshed. Use Refresh to try again.",
+      );
+      return;
+    }
+    const recovered = getSnapshot().queue.pagination?.page;
+    if (recovered && recovered !== page) {
+      replaceQueueUrl({ page: recovered, pageSize, status: filter, q });
+    }
+  }
+
+  async function recoverConflict(submissionId: string, conflictMessage: string) {
+    setFormError(conflictMessage);
+    setSuccessMessage(null);
+    const seq = ++detailRequestSeq.current;
+    try {
+      const data = await apiFetch<{ submission: QueueSubmission }>(
+        `/api/submissions/${submissionId}`,
+        { method: "GET", cache: "no-store" },
+      );
+      if (seq !== detailRequestSeq.current) {
+        return;
+      }
+      setDetail(data.submission);
+      setDetailStatus("ready");
+      setNote(data.submission.review?.note ?? note);
+      if (data.submission.review) {
+        setCheckpoints({
+          functionality: data.submission.review.functionality,
+          usability: data.submission.review.usability,
+          documentation: data.submission.review.documentation,
+        });
+      }
+    } catch {
+      if (seq !== detailRequestSeq.current) {
+        return;
+      }
+      setFormError(`${conflictMessage} Open Refresh or reload to see the saved decision.`);
+    }
+
+    const [statsOk, queueOk] = await Promise.all([
+      requestStats(),
+      requestQueue(page, pageSize, filter, q),
+    ]);
+    if (!statsOk || !queueOk) {
+      setRefreshError("Could not refresh the queue after the conflict. Use Refresh.");
+      return;
+    }
     const recovered = getSnapshot().queue.pagination?.page;
     if (recovered && recovered !== page) {
       replaceQueueUrl({ page: recovered, pageSize, status: filter, q });
@@ -225,12 +382,13 @@ export function MentorQueue() {
   }
 
   async function submitDecision(decision: ReviewDecision) {
-    if (!selected || saving) {
+    if (!detail || detail.status !== "PENDING" || saving) {
       return;
     }
 
     setNoteError(null);
     setFormError(null);
+    setRefreshError(null);
     setSuccessMessage(null);
 
     if (decision === "REJECTED") {
@@ -244,7 +402,7 @@ export function MentorQueue() {
     setSaving(true);
     try {
       const data = await apiFetch<{ submission: QueueSubmission }>(
-        `/api/reviews/submissions/${selected.id}/decision`,
+        `/api/reviews/submissions/${detail.id}/decision`,
         {
           method: "POST",
           body: JSON.stringify({
@@ -258,46 +416,9 @@ export function MentorQueue() {
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.status === 409) {
-          setFormError(error.message);
-          try {
-            const params = buildQueueSearchParams({ page, pageSize, status: filter, q });
-            const [queue, statsData] = await Promise.all([
-              apiFetch<{ submissions: QueueSubmission[]; pagination: PaginationMeta }>(
-                `/api/reviews/submissions?${params.toString()}`,
-                { method: "GET", cache: "no-store" },
-              ),
-              apiFetch<{ stats: ReviewStats }>("/api/reviews/stats", {
-                method: "GET",
-                cache: "no-store",
-              }),
-            ]);
-            write({
-              stats: { status: "ready", stats: statsData.stats, errorMessage: null },
-              queue: {
-                status: "ready",
-                submissions: queue.submissions,
-                pagination: queue.pagination,
-                errorMessage: null,
-                queryKey: queryKeyOf(page, pageSize, filter, q),
-              },
-            });
-            const fresh = queue.submissions.find((item) => item.id === selected.id) ?? null;
-            if (fresh) {
-              setSelected(fresh);
-              setNote(fresh.review?.note ?? note);
-              if (fresh.review) {
-                setCheckpoints({
-                  functionality: fresh.review.functionality,
-                  usability: fresh.review.usability,
-                  documentation: fresh.review.documentation,
-                });
-              }
-            }
-          } catch {
-            setFormError(`${error.message} Refresh the queue to see the saved decision.`);
-          }
+          await recoverConflict(detail.id, error.message);
         } else if (error.details?.length) {
-          const noteDetail = error.details.find((detail) => detail.path === "note");
+          const noteDetail = error.details.find((item) => item.path === "note");
           if (noteDetail?.message) {
             setNoteError(noteDetail.message);
           }
@@ -318,21 +439,35 @@ export function MentorQueue() {
       if (searchDebounceRef.current) {
         clearTimeout(searchDebounceRef.current);
       }
+      detailRequestSeq.current += 1;
     };
   }, []);
 
   const { stats, queue } = state;
+  const filtersActive = filter !== "PENDING" || q.length > 0 || searchInput.length > 0;
 
   return (
     <div className="min-w-0 max-w-full space-y-8">
       <section aria-label="Review statistics">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold tracking-tight">Workspace totals</h2>
-          {stats.status === "error" ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => void reloadStats()}>
-              Retry stats
+          <div className="flex flex-wrap gap-2">
+            {stats.status === "error" ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => void reloadStats()}>
+                Retry stats
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-queue-focus-fallback
+              disabled={refreshing}
+              onClick={() => void refreshWorkspace()}
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
             </Button>
-          ) : null}
+          </div>
         </div>
         {stats.errorMessage ? (
           <p className="mt-2 text-sm text-destructive" role="alert">
@@ -411,6 +546,15 @@ export function MentorQueue() {
             disabled={!searchInput && !q}
           >
             Clear search
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearFilters}
+            disabled={!filtersActive}
+          >
+            Clear filters
           </Button>
           <div className="space-y-2">
             <Label htmlFor="pageSize">Rows</Label>
@@ -515,6 +659,7 @@ export function MentorQueue() {
                         type="button"
                         size="sm"
                         variant="outline"
+                        data-queue-action="review"
                         onClick={(event) => openDialog(submission, event.currentTarget)}
                       >
                         {submission.status === "PENDING" ? "Review" : "View"}
@@ -570,15 +715,20 @@ export function MentorQueue() {
         dialogTitleId={dialogTitleId}
         noteFieldId={noteFieldId}
         checkpointsHintId={checkpointsHintId}
-        selected={selected}
+        listRow={listRow}
+        detail={detail}
+        detailStatus={detailStatus}
+        detailError={detailError}
         note={note}
         checkpoints={checkpoints}
         noteError={noteError}
         formError={formError}
+        refreshError={refreshError}
         saving={saving}
         successMessage={successMessage}
         handleDialogClose={handleDialogClose}
         closeDialog={closeDialog}
+        retryDetail={retryDetail}
         setNote={setNote}
         setCheckpoint={setCheckpoint}
         submitDecision={submitDecision}

@@ -23,6 +23,22 @@ export type QueueReview = {
   };
 };
 
+/** Compact queue row — enough for the table without full description/review payloads. */
+export type QueueListItem = {
+  id: string;
+  projectName: string;
+  repositoryUrl: string;
+  liveUrl: string;
+  status: SubmissionStatus;
+  createdAt: string;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
+  };
+};
+
+/** Full project details loaded on demand (and returned by decision responses). */
 export type QueueSubmission = {
   id: string;
   projectName: string;
@@ -56,3 +72,5 @@ export type ReviewStats = {
   rejected: number;
   total: number;
 };
+
+export type DetailLoadStatus = "idle" | "loading" | "ready" | "error" | "missing";

@@ -25,8 +25,48 @@ export const submissionSelect = {
   },
 } as const;
 
+/** Mentor detail includes owner identity and reviewer for the review dialog. */
+export const mentorSubmissionDetailSelect = {
+  id: true,
+  projectName: true,
+  repositoryUrl: true,
+  canonicalRepositoryUrl: true,
+  liveUrl: true,
+  description: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+  owner: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  review: {
+    select: {
+      decision: true,
+      note: true,
+      functionality: true,
+      usability: true,
+      documentation: true,
+      reviewedAt: true,
+      mentor: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+} as const;
+
 export type SubmissionView = Prisma.SubmissionGetPayload<{
   select: typeof submissionSelect;
+}>;
+
+export type MentorSubmissionDetail = Prisma.SubmissionGetPayload<{
+  select: typeof mentorSubmissionDetailSelect;
 }>;
 
 export type PaginationMeta = {
@@ -161,12 +201,12 @@ export async function getMySubmissionStats(ownerId: string): Promise<OwnerSubmis
 
 /**
  * Students may read only their own rows (missing/foreign → same 404).
- * Mentors may read any submission in the review workflow.
+ * Mentors may read any submission in the review workflow with owner/reviewer fields.
  */
 export async function getSubmissionForViewer(
   viewer: { id: string; role: Role },
   submissionId: string,
-): Promise<SubmissionView> {
+): Promise<SubmissionView | MentorSubmissionDetail> {
   if (viewer.role === Role.STUDENT) {
     const submission = await prisma.submission.findFirst({
       where: { id: submissionId, ownerId: viewer.id },
@@ -181,7 +221,7 @@ export async function getSubmissionForViewer(
   if (viewer.role === Role.MENTOR) {
     const submission = await prisma.submission.findUnique({
       where: { id: submissionId },
-      select: submissionSelect,
+      select: mentorSubmissionDetailSelect,
     });
     if (!submission) {
       throw new SubmissionNotFoundError();

@@ -2,7 +2,7 @@
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { buildQueueSearchParams, queryKeyOf } from "./queue-query";
-import type { PaginationMeta, QueueStatusFilter, QueueSubmission, ReviewStats } from "./types";
+import type { PaginationMeta, QueueListItem, QueueStatusFilter, ReviewStats } from "./types";
 
 // Browser-only cache. Request IDs discard older responses after filter/navigation changes.
 type LoadStatus = "loading" | "ready" | "error";
@@ -15,7 +15,7 @@ type StatsSlice = {
 
 type QueueSlice = {
   status: LoadStatus;
-  submissions: QueueSubmission[];
+  submissions: QueueListItem[];
   pagination: PaginationMeta | null;
   errorMessage: string | null;
   queryKey: string;
@@ -39,8 +39,8 @@ let store: StoreState = {
   },
 };
 
-let statsPromise: Promise<void> | null = null;
-let queuePromise: Promise<void> | null = null;
+let statsPromise: Promise<boolean> | null = null;
+let queuePromise: Promise<boolean> | null = null;
 let queueRequestSeq = 0;
 let statsRequestSeq = 0;
 const listeners = new Set<() => void>();
@@ -73,7 +73,7 @@ export function write(next: StoreState) {
   emit();
 }
 
-async function fetchStats(): Promise<void> {
+async function fetchStats(): Promise<boolean> {
   const seq = ++statsRequestSeq;
   write({
     ...store,
@@ -84,13 +84,14 @@ async function fetchStats(): Promise<void> {
       method: "GET",
       cache: "no-store",
     });
-    if (seq !== statsRequestSeq) return;
+    if (seq !== statsRequestSeq) return false;
     write({
       ...store,
       stats: { status: "ready", stats: data.stats, errorMessage: null },
     });
+    return true;
   } catch (error) {
-    if (seq !== statsRequestSeq) return;
+    if (seq !== statsRequestSeq) return false;
     write({
       ...store,
       stats: {
@@ -99,6 +100,7 @@ async function fetchStats(): Promise<void> {
         errorMessage: error instanceof ApiError ? error.message : "Unable to load statistics.",
       },
     });
+    return false;
   }
 }
 
@@ -107,7 +109,7 @@ async function fetchQueue(
   pageSize: number,
   status: QueueStatusFilter,
   q: string,
-): Promise<void> {
+): Promise<boolean> {
   const key = queryKeyOf(page, pageSize, status, q);
   const seq = ++queueRequestSeq;
   write({
@@ -124,14 +126,14 @@ async function fetchQueue(
   try {
     const params = buildQueueSearchParams({ page, pageSize, status, q });
     const data = await apiFetch<{
-      submissions: QueueSubmission[];
+      submissions: QueueListItem[];
       pagination: PaginationMeta;
     }>(`/api/reviews/submissions?${params.toString()}`, {
       method: "GET",
       cache: "no-store",
     });
     if (seq !== queueRequestSeq) {
-      return;
+      return false;
     }
 
     let rows = data.submissions;
@@ -142,14 +144,14 @@ async function fetchQueue(
       pageUsed = meta.totalPages;
       const retryParams = buildQueueSearchParams({ page: pageUsed, pageSize, status, q });
       const retry = await apiFetch<{
-        submissions: QueueSubmission[];
+        submissions: QueueListItem[];
         pagination: PaginationMeta;
       }>(`/api/reviews/submissions?${retryParams.toString()}`, {
         method: "GET",
         cache: "no-store",
       });
       if (seq !== queueRequestSeq) {
-        return;
+        return false;
       }
       rows = retry.submissions;
       meta = retry.pagination;
@@ -165,9 +167,10 @@ async function fetchQueue(
         queryKey: queryKeyOf(pageUsed, pageSize, status, q),
       },
     });
+    return true;
   } catch (error) {
     if (seq !== queueRequestSeq) {
-      return;
+      return false;
     }
     write({
       ...store,
@@ -179,12 +182,13 @@ async function fetchQueue(
         queryKey: key,
       },
     });
+    return false;
   }
 }
 
-export function ensureStats(): Promise<void> {
+export function ensureStats(): Promise<boolean> {
   if (typeof window === "undefined") {
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
   if (!statsPromise) {
     statsPromise = fetchStats();
@@ -197,9 +201,9 @@ export function ensureQueue(
   pageSize: number,
   status: QueueStatusFilter,
   q: string,
-): Promise<void> {
+): Promise<boolean> {
   if (typeof window === "undefined") {
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
   const key = queryKeyOf(page, pageSize, status, q);
   if (!queuePromise || store.queue.queryKey !== key) {
@@ -208,7 +212,7 @@ export function ensureQueue(
   return queuePromise;
 }
 
-export function requestStats(): Promise<void> {
+export function requestStats(): Promise<boolean> {
   statsPromise = fetchStats();
   return statsPromise;
 }
@@ -218,7 +222,7 @@ export function requestQueue(
   pageSize: number,
   status: QueueStatusFilter,
   q: string,
-): Promise<void> {
+): Promise<boolean> {
   queuePromise = fetchQueue(page, pageSize, status, q);
   return queuePromise;
 }
