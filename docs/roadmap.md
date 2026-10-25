@@ -120,10 +120,11 @@ Copy-ready execution prompts and shared constraints live in [the upgrade guide](
 - [x] Keep GitHub reachability, observed Actions CI, deployment host verification, and Part 2 videos as separate open items.
 - [x] Audit auth, ownership, duplicates, limits, cookies, Origin, filters, reviews, and session/error recovery against live assertions.
 - [x] Fix login bcrypt 72-byte truncation gap; harden `hashPassword` / `verifyPassword`; add auth regressions (including current DB role).
+- [x] Fix mentor queue out-of-range page recovery so URL and Prev/Next stay aligned.
 - [x] Record performance risks without claiming unmeasured wins; defer browse/detail to U4/U5 and optimization to U6.
 - [x] Verify sequentially: `check`, `build`, `db:check`, `auth:check`, `submissions:check`, `reviews:check`, `test:e2e` (all passed locally).
 
-Commit: `fix: reject over-long passwords on login`
+Commits: `fix: reject over-long passwords on login`; `fix: sync mentor queue URL after page recovery`
 
 ### Remaining upgrade phases
 

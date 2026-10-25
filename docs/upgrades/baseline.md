@@ -52,6 +52,10 @@ Covered by existing assertions (and still holding after U1): current DB user loo
 2. **Current-role assertion gap (coverage only)**  
    Middleware already reloads the user (including role) from PostgreSQL. Added an explicit promote/demote assertion in `auth:check` so role changes mid-session are locked in.
 
+3. **Mentor queue out-of-range page vs URL / Prev–Next**  
+   The store could recover an empty high page to `totalPages` while the URL stayed on the requested page, so Previous/Next stepped from the stale URL page.  
+   **Fix:** sync the queue URL when recovered `pagination.page` differs from the URL page; Prev/Next use `pagination.page`.
+
 ## Performance baseline (U1)
 
 Larger optimization is deferred to U6. Student browse/detail work is deferred to U4/U5.

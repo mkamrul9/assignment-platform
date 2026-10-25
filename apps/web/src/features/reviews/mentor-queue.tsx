@@ -115,6 +115,18 @@ export function MentorQueue() {
     [page, pageSize, filter, q],
   );
 
+  // The store may clamp an empty out-of-range request to the last page. Keep the
+  // URL (and Prev/Next, which read URL page) aligned with that recovered page.
+  useEffect(() => {
+    if (state.queue.status !== "ready" || !state.queue.pagination) {
+      return;
+    }
+    const recovered = state.queue.pagination.page;
+    if (recovered !== page) {
+      replaceQueueUrl({ page: recovered, pageSize, status: filter, q });
+    }
+  }, [state.queue.status, state.queue.pagination, page, pageSize, filter, q, replaceQueueUrl]);
+
   function openDialog(submission: QueueSubmission, trigger?: HTMLElement | null) {
     triggerRef.current = trigger ?? (document.activeElement as HTMLElement | null);
     setSelected(submission);
@@ -518,7 +530,11 @@ export function MentorQueue() {
                 size="sm"
                 variant="outline"
                 disabled={!queue.pagination.hasPreviousPage}
-                onClick={() => goToPage(Math.max(1, page - 1))}
+                onClick={() => {
+                  const current = queue.pagination;
+                  if (!current) return;
+                  goToPage(Math.max(1, current.page - 1));
+                }}
               >
                 Previous
               </Button>
@@ -527,7 +543,11 @@ export function MentorQueue() {
                 size="sm"
                 variant="outline"
                 disabled={!queue.pagination.hasNextPage}
-                onClick={() => goToPage(page + 1)}
+                onClick={() => {
+                  const current = queue.pagination;
+                  if (!current) return;
+                  goToPage(current.page + 1);
+                }}
               >
                 Next
               </Button>
