@@ -21,4 +21,5 @@ apps/api/src/generated/
 /e2e/.runtime/
 /e2e/.auth/
 /.local/
+/docs/
 

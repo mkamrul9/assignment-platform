@@ -595,7 +595,7 @@ async function runChecks() {
       ],
     };
 
-    const outDir = path.join(repoRoot, "docs", "upgrades");
+    const outDir = path.join(repoRoot, ".local");
     mkdirSync(outDir, { recursive: true });
     const outPath = path.join(outDir, "perf-raw.json");
     writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");

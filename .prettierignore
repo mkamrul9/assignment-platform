@@ -11,4 +11,5 @@ playwright-report
 blob-report
 e2e/.runtime
 e2e/.auth
-docs/videos
+docs
+.local
