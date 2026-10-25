@@ -98,11 +98,16 @@ POST   /api/auth/logout
 GET    /api/auth/me
 GET    /api/demo/accounts          # only when DEMO_MODE=1; otherwise absent/404
 POST   /api/submissions
-GET    /api/submissions/mine
+GET    /api/submissions/mine?page&pageSize&status&q
+GET    /api/submissions/:id
 GET    /api/reviews/submissions?page&pageSize&status&q
 GET    /api/reviews/stats
 POST   /api/reviews/submissions/:id/decision
 ```
+
+`GET /api/submissions/mine` is student-only. Defaults are `page=1`, `pageSize=10`, `status=ALL`. `status` accepts `ALL`, `PENDING`, `APPROVED`, or `REJECTED`. Optional `q` (trimmed, max 100 characters) searches the owner's project name and repository URL. Ownership is taken only from the authenticated student. Filtering, search, counting, ordering (`createdAt` desc, `id` desc), and pagination run in PostgreSQL. Responses include `{ submissions, pagination, stats }` where `stats` are owner-scoped totals independent of list filters. Out-of-range pages return an empty `submissions` array with stable pagination metadata. The student workspace keeps `q`, `status`, `page`, and `pageSize` in the URL and opens `/student/projects/[id]` for full details and a factual creation/review timeline.
+
+`GET /api/submissions/:id` allows students to read only their own submissions and mentors to read review-workflow submissions. Students receive `404` for missing or non-owned IDs. `/mine` is registered before `/:id`.
 
 `GET /api/reviews/submissions` is mentor-only. Defaults are `page=1`, `pageSize=10`, `status=PENDING`. `status` accepts `ALL`, `PENDING`, `APPROVED`, or `REJECTED`. Optional `q` (trimmed, max 100 characters) searches project name, student name/email, and repository URL with case-insensitive Prisma matching. Ordering is `createdAt` descending, then `id` descending. Filtering, search, counting, and pagination run together in PostgreSQL. Out-of-range pages return an empty `submissions` array with stable pagination metadata for the requested page. Responses use explicit field selection and `Cache-Control: no-store`. The mentor UI keeps `q`, `status`, `page`, and `pageSize` in the URL.
 
@@ -124,7 +129,7 @@ Reference documentation: [Next.js installation](https://nextjs.org/docs/app/gett
 
 ## Maintenance and lifecycle contracts
 
-The mentor feature separates `mentor-queue.tsx` (composition), `mentor-queue-store.ts` (request sequencing/cache), `queue-query.ts` (URL contracts), `review-dialog.tsx` (dialog presentation), and `presentation.ts` (display formatting). Browser stores use stable server snapshots; account changes invalidate private caches and in-flight requests. Authenticated API 401 responses notify the session provider so guards can navigate to login. Logout is acknowledged only after the API clears the cookie.
+The mentor feature separates `mentor-queue.tsx` (composition), `mentor-queue-store.ts` (request sequencing/cache), `queue-query.ts` (URL contracts), `review-dialog.tsx` (dialog presentation), and `presentation.ts` (display formatting). The student workspace separates `project-list.tsx` (composition), `project-list-store.ts` (request sequencing/cache), `mine-query.ts` (URL contracts), and `project-detail.tsx` (authorized detail view). Browser stores use stable server snapshots; account changes invalidate private caches and in-flight requests. Authenticated API 401 responses notify the session provider so guards can navigate to login. Logout is acknowledged only after the API clears the cookie.
 
 API routes share field-error serialization in `lib/validation.ts`, explicit safe user selection in `lib/public-user.ts`, and the same password/email helpers as the mentor seed. Shutdown drains HTTP requests before disconnecting Prisma. The web proxy maps upstream connection/timeout failures to safe JSON gateway errors.
 

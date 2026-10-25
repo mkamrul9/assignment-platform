@@ -36,7 +36,7 @@ test("a protected API 401 sends an open workspace back to login", async ({ page 
     password: "student-pass-1",
   });
   await expect(page.getByText(/have not submitted a project yet/i)).toBeVisible();
-  await page.route("**/api/submissions/mine", (route) =>
+  await page.route("**/api/submissions/mine**", (route) =>
     route.fulfill({
       status: 401,
       contentType: "application/json",

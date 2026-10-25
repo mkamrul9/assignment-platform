@@ -1,7 +1,7 @@
-import { Prisma } from "../../generated/prisma/client.js";
+import { Prisma, Role, SubmissionStatus } from "../../generated/prisma/client.js";
 import { canonicalizeRepositoryUrl } from "../../lib/canonical-repository-url.js";
 import { prisma } from "../../lib/prisma.js";
-import type { CreateSubmissionInput } from "./submissions.schemas.js";
+import type { CreateSubmissionInput, MineQuery } from "./submissions.schemas.js";
 
 export const submissionSelect = {
   id: true,
@@ -29,11 +29,59 @@ export type SubmissionView = Prisma.SubmissionGetPayload<{
   select: typeof submissionSelect;
 }>;
 
+export type PaginationMeta = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+};
+
+export type OwnerSubmissionStats = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+};
+
 export class SubmissionConflictError extends Error {
   constructor(message = "A project with this repository URL has already been submitted.") {
     super(message);
     this.name = "SubmissionConflictError";
   }
+}
+
+export class SubmissionNotFoundError extends Error {
+  constructor(message = "Submission not found.") {
+    super(message);
+    this.name = "SubmissionNotFoundError";
+  }
+}
+
+function statusFilter(status: MineQuery["status"]): Prisma.SubmissionWhereInput {
+  if (status === "ALL") {
+    return {};
+  }
+  return { status: status as SubmissionStatus };
+}
+
+function searchFilter(q: string | undefined): Prisma.SubmissionWhereInput {
+  if (!q) {
+    return {};
+  }
+  return {
+    OR: [
+      { projectName: { contains: q, mode: "insensitive" } },
+      { repositoryUrl: { contains: q, mode: "insensitive" } },
+    ],
+  };
+}
+
+function mineWhere(ownerId: string, query: MineQuery): Prisma.SubmissionWhereInput {
+  return {
+    AND: [{ ownerId }, statusFilter(query.status), searchFilter(query.q)],
+  };
 }
 
 export async function createSubmission(
@@ -63,10 +111,83 @@ export async function createSubmission(
   }
 }
 
-export async function listMySubmissions(ownerId: string): Promise<SubmissionView[]> {
-  return prisma.submission.findMany({
-    where: { ownerId },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    select: submissionSelect,
-  });
+export async function listMySubmissions(
+  ownerId: string,
+  query: MineQuery,
+): Promise<{
+  submissions: SubmissionView[];
+  pagination: PaginationMeta;
+}> {
+  const where = mineWhere(ownerId, query);
+  const total = await prisma.submission.count({ where });
+  const totalPages = total === 0 ? 0 : Math.ceil(total / query.pageSize);
+  const skip = (query.page - 1) * query.pageSize;
+
+  // Out-of-range pages return an empty page with stable pagination metadata.
+  const submissions =
+    total === 0 || skip >= total
+      ? []
+      : await prisma.submission.findMany({
+          where,
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          skip,
+          take: query.pageSize,
+          select: submissionSelect,
+        });
+
+  return {
+    submissions,
+    pagination: {
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+      totalPages,
+      hasNextPage: totalPages > 0 && query.page < totalPages,
+      hasPreviousPage: query.page > 1 && totalPages > 0,
+    },
+  };
+}
+
+/** Owner-scoped totals independent of list filters/search. */
+export async function getMySubmissionStats(ownerId: string): Promise<OwnerSubmissionStats> {
+  const [pending, approved, rejected, total] = await Promise.all([
+    prisma.submission.count({ where: { ownerId, status: SubmissionStatus.PENDING } }),
+    prisma.submission.count({ where: { ownerId, status: SubmissionStatus.APPROVED } }),
+    prisma.submission.count({ where: { ownerId, status: SubmissionStatus.REJECTED } }),
+    prisma.submission.count({ where: { ownerId } }),
+  ]);
+  return { pending, approved, rejected, total };
+}
+
+/**
+ * Students may read only their own rows (missing/foreign → same 404).
+ * Mentors may read any submission in the review workflow.
+ */
+export async function getSubmissionForViewer(
+  viewer: { id: string; role: Role },
+  submissionId: string,
+): Promise<SubmissionView> {
+  if (viewer.role === Role.STUDENT) {
+    const submission = await prisma.submission.findFirst({
+      where: { id: submissionId, ownerId: viewer.id },
+      select: submissionSelect,
+    });
+    if (!submission) {
+      throw new SubmissionNotFoundError();
+    }
+    return submission;
+  }
+
+  if (viewer.role === Role.MENTOR) {
+    const submission = await prisma.submission.findUnique({
+      where: { id: submissionId },
+      select: submissionSelect,
+    });
+    if (!submission) {
+      throw new SubmissionNotFoundError();
+    }
+    return submission;
+  }
+
+  throw new SubmissionNotFoundError();
 }

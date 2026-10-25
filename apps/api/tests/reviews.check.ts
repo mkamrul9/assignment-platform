@@ -872,26 +872,28 @@ async function runChecks() {
       `unexpected approved/rejected after race: ${JSON.stringify(finalStats)}`,
     );
 
-    // Student sees updated status/feedback through /mine
-    const mine = await requestJson(baseUrl, "GET", "/api/submissions/mine", {
+    // Student sees updated status/feedback through bounded /mine
+    const mine = await requestJson(baseUrl, "GET", "/api/submissions/mine?pageSize=50", {
       cookie: studentCookie,
     });
     assert(mine.status === 200, "student mine expected 200");
-    const mineRows = (
-      mine.body as {
-        submissions: Array<{
-          id: string;
-          status: string;
-          review: {
-            note: string | null;
-            decision: string;
-            functionality: string;
-            usability: string;
-            documentation: string;
-          } | null;
-        }>;
-      }
-    ).submissions;
+    assert(mine.headers.get("cache-control")?.includes("no-store"), "mine must be no-store");
+    const mineBody = mine.body as {
+      submissions: Array<{
+        id: string;
+        status: string;
+        review: {
+          note: string | null;
+          decision: string;
+          functionality: string;
+          usability: string;
+          documentation: string;
+        } | null;
+      }>;
+      pagination: { total: number };
+    };
+    assert(mineBody.pagination.total >= mineBody.submissions.length, "mine pagination present");
+    const mineRows = mineBody.submissions;
     const rejectedMine = mineRows.find((item) => item.id === pendingIds[2]);
     assert(rejectedMine?.status === "REJECTED", "student sees rejected status");
     assert(rejectedMine?.review?.note?.includes("README"), "student sees rejection feedback");

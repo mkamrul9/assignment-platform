@@ -27,11 +27,7 @@ type FixtureSpec = {
 function buildFixtures(): FixtureSpec[] {
   const fixtures: FixtureSpec[] = [];
   let index = 1;
-  const push = (
-    ownerId: string,
-    status: FixtureSpec["status"],
-    review?: FixtureSpec["review"],
-  ) => {
+  const push = (ownerId: string, status: FixtureSpec["status"], review?: FixtureSpec["review"]) => {
     const key = `project-${String(index).padStart(2, "0")}`;
     fixtures.push({
       key,

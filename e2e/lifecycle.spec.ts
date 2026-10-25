@@ -64,11 +64,18 @@ test("student and mentor review lifecycle through the proxied UI", async ({ brow
   });
   await expect(page.getByRole("alert")).toBeVisible();
 
-  // Persisted details after navigation/reload
+  // Persisted list + details after navigation/reload
   await page.goto("/student");
   await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
   await expect(page.getByText(/pending review/i)).toBeVisible();
+  await page.getByRole("link", { name: /view details/i }).click();
+  await expect(page).toHaveURL(/\/student\/projects\//);
+  await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
+  await expect(page.getByText(description)).toBeVisible();
   await page.reload();
+  await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
+  await page.getByRole("link", { name: /back to projects/i }).click();
+  await expect(page).toHaveURL(/\/student/);
   await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
   await page.screenshot({
     path: path.join(SCREENSHOT_DIR, "student-projects.png"),
@@ -147,11 +154,19 @@ test("student and mentor review lifecycle through the proxied UI", async ({ brow
 
   await mentor.context.close();
 
-  // Student sees resulting status/feedback after reload
+  // Student sees resulting status/feedback on the details page after reload
   await page.goto("/student");
   await page.reload();
   await expect(page.getByText(/^approved$/i).first()).toBeVisible();
+  await page.getByRole("link", { name: projectName }).click();
+  await expect(page).toHaveURL(/\/student\/projects\//);
+  await expect(page.getByText(/^approved$/i).first()).toBeVisible();
   await expect(page.getByText(/browser lifecycle review/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^timeline$/i })).toBeVisible();
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, "student-project-detail.png"),
+    fullPage: true,
+  });
 
   // Session expiry → login navigation
   const expired = await new SignJWT({})

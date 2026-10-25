@@ -112,9 +112,12 @@ test("drafts, search URL state, checkpoints, and stats stability", async ({ brow
   await mentor.page.keyboard.press("Enter");
   await expect(mentor.page.getByLabel(/search projects/i)).toHaveValue("");
 
-  // Student sees checkpoints
+  // Student sees checkpoints on the project details page
   await mentor.context.close();
   await login(page, { email: studentAEmail, password }, /\/student/);
+  await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
+  await page.getByRole("link", { name: /view details/i }).click();
+  await expect(page).toHaveURL(/\/student\/projects\//);
   await expect(page.getByRole("heading", { name: projectName })).toBeVisible();
   await expect(page.getByText(/meets expectations/i).first()).toBeVisible();
   await expect(page.getByText(/needs improvement/i).first()).toBeVisible();

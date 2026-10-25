@@ -304,12 +304,19 @@ async function runChecks() {
     assert(mentorLogin.status === 200, `mentor login expected 200, got ${mentorLogin.status}`);
     const mentorCookie = `${parseSetCookie(mentorLogin.setCookie).name}=${parseSetCookie(mentorLogin.setCookie).value}`;
 
-    const studentMine = await requestJson(enabled.baseUrl, "GET", "/api/submissions/mine", {
-      cookie: studentCookie,
-    });
+    const studentMine = await requestJson(
+      enabled.baseUrl,
+      "GET",
+      "/api/submissions/mine?pageSize=50",
+      { cookie: studentCookie },
+    );
     assert(studentMine.status === 200, "student mine expected 200");
-    const mine = (studentMine.body as { submissions: Array<{ projectName: string }> }).submissions;
-    assert(mine.length > 0, "student A should own demo projects");
+    const mineBody = studentMine.body as {
+      submissions: Array<{ projectName: string }>;
+      pagination: { total: number };
+    };
+    assert(mineBody.pagination.total > 0, "student A should own demo projects");
+    assert(mineBody.submissions.length > 0, "student A mine page should include projects");
 
     const studentBLogin = await requestJson(enabled.baseUrl, "POST", "/api/auth/login", {
       origin: TRUSTED_ORIGIN,
@@ -319,10 +326,10 @@ async function runChecks() {
       },
     });
     const studentBCookie = `${parseSetCookie(studentBLogin.setCookie).name}=${parseSetCookie(studentBLogin.setCookie).value}`;
-    const mineB = await requestJson(enabled.baseUrl, "GET", "/api/submissions/mine", {
+    const mineB = await requestJson(enabled.baseUrl, "GET", "/api/submissions/mine?pageSize=50", {
       cookie: studentBCookie,
     });
-    const namesA = new Set(mine.map((item) => item.projectName));
+    const namesA = new Set(mineBody.submissions.map((item) => item.projectName));
     const namesB = (mineB.body as { submissions: Array<{ projectName: string }> }).submissions.map(
       (item) => item.projectName,
     );

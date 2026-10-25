@@ -161,7 +161,8 @@ Screenshots captured from the working application with synthetic accounts:
 
 - [Student empty state](docs/screenshots/student-empty.png)
 - [Submission confirmation](docs/screenshots/student-submit-success.png)
-- [Student projects and feedback](docs/screenshots/student-projects.png)
+- [Student projects list](docs/screenshots/student-projects.png)
+- [Student project details](docs/screenshots/student-project-detail.png)
 - [Mentor queue](docs/screenshots/mentor-queue.png)
 - [Review dialog](docs/screenshots/mentor-review-dialog.png)
 

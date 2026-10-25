@@ -24,3 +24,19 @@ export type Submission = {
   updatedAt: string;
   review: SubmissionReview | null;
 };
+
+export type PaginationMeta = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+};
+
+export type OwnerSubmissionStats = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+};

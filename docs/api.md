@@ -10,7 +10,8 @@ Browser requests use the web origin's relative `/api` routes. The examples below
 - `GET /api/demo/accounts`: only when `DEMO_MODE=1`; `200 { notice, accounts }` with intentionally public synthetic emails/passwords. Absent/404 when demo mode is off. Never includes real mentor credentials, JWT secrets, or database URLs.
 - `POST /api/auth/logout`: `204`, clearing the cookie even if it is missing/expired. Signup, login, logout, submissions, and decisions require an exact trusted `Origin`.
 - `POST /api/submissions`: student only; `{ projectName, repositoryUrl, liveUrl, description }` -> `201 { submission }`, initially `PENDING`. Unknown/privileged fields are rejected. Repository duplicates return `409` without identifying another student.
-- `GET /api/submissions/mine`: student only; `200 { submissions }`. Ownership comes from the session, not query parameters. Rows are newest first by `createdAt`, then `id`, both descending. Includes stored review decision, note, checkpoints, and timestamp when available.
+- `GET /api/submissions/mine`: student only; `200 { submissions, pagination, stats }`. Query: `page` (default 1), `pageSize` (default 10, max 50), `status` (`ALL` default, also `PENDING`/`APPROVED`/`REJECTED`), optional trimmed `q` (max 100; project name and repository URL). Ownership comes from the session only. Filtering, search, counting, ordering, and pagination run in PostgreSQL. Rows are newest first by `createdAt`, then `id`, both descending. Includes stored review decision, note, checkpoints, and timestamp when available. `stats` are owner-scoped totals independent of list filters. Empty results use `totalPages: 0`; out-of-range pages return an empty `submissions` array with metadata for the requested page. Repeated/invalid/unknown query fields are rejected.
+- `GET /api/submissions/:id`: student or mentor; `200 { submission }`. Students may read only their own rows (missing or another student's project → `404` without disclosure). Mentors may read submissions in the review workflow. `/mine` is registered before `/:id`. Safe fields only; `Cache-Control: no-store`.
 - `GET /api/reviews/submissions`: mentor only; `200 { submissions, pagination }`. Safe project/student/reviewer fields are explicitly selected.
 - `GET /api/reviews/stats`: mentor only; `200 { stats: { pending, approved, rejected, total } }`. One database aggregation counts every submission independently of filters/search.
 - `POST /api/reviews/submissions/:id/decision`: mentor only; `{ decision, note?, checkpoints? }` -> `200 { submission }`. Only pending projects can transition. Missing IDs return `404`; repeated/competing decisions return `409` and cannot overwrite the winning review.
@@ -89,7 +90,8 @@ curl --fail-with-body -sS -b "$MENTOR_COOKIES" \
   --data '{"decision":"REJECTED","note":"Please expand the README with complete setup steps.","checkpoints":{"documentation":"NEEDS_IMPROVEMENT"}}' \
   "$BASE/api/reviews/submissions/$PROJECT_ID/decision"
 
-curl --fail-with-body -sS -b "$STUDENT_COOKIES" "$BASE/api/submissions/mine"
+curl --fail-with-body -sS -b "$STUDENT_COOKIES" "$BASE/api/submissions/mine?page=1&pageSize=10&status=ALL"
+curl --fail-with-body -sS -b "$STUDENT_COOKIES" "$BASE/api/submissions/$PROJECT_ID"
 curl --fail-with-body -sS -b "$STUDENT_COOKIES" -c "$STUDENT_COOKIES" -X POST -H "Origin: $BASE" "$BASE/api/auth/logout"
 curl --fail-with-body -sS -b "$MENTOR_COOKIES" -c "$MENTOR_COOKIES" -X POST -H "Origin: $BASE" "$BASE/api/auth/logout"
 ```
@@ -146,9 +148,10 @@ $decisionBody = @{
 Invoke-RestMethod -Method Post -Uri "$base/api/reviews/submissions/$projectId/decision" `
   -Headers $headers -ContentType 'application/json' -Body $decisionBody -WebSession $mentor
 
-Invoke-RestMethod -Uri "$base/api/submissions/mine" -WebSession $student
+Invoke-RestMethod -Uri "$base/api/submissions/mine?page=1&pageSize=10&status=ALL" -WebSession $student
+Invoke-RestMethod -Uri "$base/api/submissions/$projectId" -WebSession $student
 Invoke-RestMethod -Method Post -Uri "$base/api/auth/logout" -Headers $headers -WebSession $student
 Invoke-RestMethod -Method Post -Uri "$base/api/auth/logout" -Headers $headers -WebSession $mentor
 ```
 
-The final student list includes `REJECTED`, the note, and the documentation checkpoint. Use a new synthetic repository URL for another run: canonical URLs remain reserved after a review. Approval uses the same decision endpoint with `APPROVED` and an optional note.
+The final student list and detail responses include `REJECTED`, the note, and the documentation checkpoint. Use a new synthetic repository URL for another run: canonical URLs remain reserved after a review. Approval uses the same decision endpoint with `APPROVED` and an optional note.

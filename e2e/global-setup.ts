@@ -167,9 +167,10 @@ export default async function globalSetup() {
         TRUST_PROXY: "1",
         SESSION_COOKIE_NAME: "reviewdock_session",
         DEMO_MODE: "1",
-        // Shared Next→Express peer IP; raise signup so the full suite can create accounts.
-        // Keep the default login limit so proxy-trust can still observe shared IP buckets.
+        // Shared Next→Express peer IP; raise signup/login so the full suite can create
+        // accounts and re-authenticate. proxy-trust still asserts shared RateLimit buckets.
         SIGNUP_RATE_LIMIT_MAX: "100",
+        LOGIN_RATE_LIMIT_MAX: "80",
       },
     });
 

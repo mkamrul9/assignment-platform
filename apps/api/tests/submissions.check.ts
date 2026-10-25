@@ -213,6 +213,9 @@ async function runChecks() {
   process.env.WEB_ORIGINS = TRUSTED_ORIGIN;
   process.env.TRUST_PROXY = "0";
   process.env.SESSION_COOKIE_NAME = COOKIE_NAME;
+  // Core checks create several students; keep rate limits for the dedicated rate phase only.
+  process.env.SIGNUP_RATE_LIMIT_MAX = "100";
+  process.env.SUBMISSION_RATE_LIMIT_MAX = "100";
 
   const { createApp } = await import("../src/app.js");
   const { prisma } = await import("../src/lib/prisma.js");
@@ -453,7 +456,7 @@ async function runChecks() {
     assert(mentorListBlocked.status === 403, "mentor list must be 403");
 
     // Ownership isolation + review feedback
-    await requestJson(baseUrl, "POST", "/api/submissions", {
+    const studentBCreate = await requestJson(baseUrl, "POST", "/api/submissions", {
       origin: TRUSTED_ORIGIN,
       cookie: studentB,
       body: validPayload({
@@ -462,29 +465,288 @@ async function runChecks() {
         liveUrl: "https://b-only.example.com",
       }),
     });
+    assert(studentBCreate.status === 201, "student B create failed");
+    const studentBSubmissionId = (studentBCreate.body as { submission: { id: string } }).submission
+      .id;
+
+    type MineBody = {
+      submissions: Array<{
+        id: string;
+        projectName: string;
+        status: string;
+        review: { note: string | null } | null;
+      }>;
+      pagination: {
+        page: number;
+        pageSize: number;
+        total: number;
+        totalPages: number;
+        hasNextPage: boolean;
+        hasPreviousPage: boolean;
+      };
+      stats: { pending: number; approved: number; rejected: number; total: number };
+    };
 
     const listA = await requestJson(baseUrl, "GET", "/api/submissions/mine", { cookie: studentA });
     assert(listA.status === 200, "student A list failed");
     assert(listA.headers.get("cache-control")?.includes("no-store"), "list must be no-store");
-    const submissionsA = (
-      listA.body as {
-        submissions: Array<{ projectName: string; review: { note: string | null } | null }>;
-      }
-    ).submissions;
+    const mineA = listA.body as MineBody;
+    assert(Array.isArray(mineA.submissions), "mine must include submissions array");
+    assert(mineA.pagination && typeof mineA.pagination.total === "number", "mine pagination");
+    assert(mineA.stats && typeof mineA.stats.total === "number", "mine stats");
     assert(
-      submissionsA.every((item) => item.projectName !== "Student B Only"),
+      mineA.submissions.every((item) => item.projectName !== "Student B Only"),
       "student A must not see student B projects",
     );
-    const reviewedView = submissionsA.find((item) => item.projectName === "Reviewed Project");
+    const reviewedView = mineA.submissions.find((item) => item.projectName === "Reviewed Project");
     assert(reviewedView?.review?.note?.includes("setup instructions"), "review feedback missing");
 
-    const listB = await requestJson(baseUrl, "GET", "/api/submissions/mine", { cookie: studentB });
-    const submissionsB = (listB.body as { submissions: Array<{ projectName: string }> })
-      .submissions;
+    const listB = await requestJson(baseUrl, "GET", "/api/submissions/mine?pageSize=50", {
+      cookie: studentB,
+    });
+    const mineB = listB.body as MineBody;
     assert(
-      submissionsB.every((item) => item.projectName !== "Reviewed Project"),
+      mineB.submissions.every((item) => item.projectName !== "Reviewed Project"),
       "student B must not see student A projects",
     );
+
+    // Defaults, validation, search, pagination, detail authorization
+    const browseStudent = await signup(
+      "Browse Student",
+      "browse-student@example.com",
+      "student-pass-1",
+    );
+    const browseUser = await prisma.user.findUniqueOrThrow({
+      where: { email: "browse-student@example.com" },
+    });
+    const fixedTime = new Date("2024-06-01T12:00:00.000Z");
+    const browseSeeds: Array<{ id: string; projectName: string; status: string }> = [];
+    for (let i = 0; i < 12; i += 1) {
+      const status =
+        i < 5
+          ? SubmissionStatus.PENDING
+          : i < 8
+            ? SubmissionStatus.APPROVED
+            : SubmissionStatus.REJECTED;
+      const submission = await prisma.submission.create({
+        data: {
+          ownerId: browseUser.id,
+          projectName: i % 2 === 0 ? `Alpha Browse ${i}` : `Beta Browse ${i}`,
+          repositoryUrl: `https://github.com/browse/repo-${i}`,
+          canonicalRepositoryUrl: `https://github.com/browse/repo-${i}`,
+          liveUrl: `https://browse-${i}.example.com`,
+          description: "Bounded browse description for student workspace checks.",
+          status,
+          createdAt: fixedTime,
+          updatedAt: fixedTime,
+        },
+      });
+      if (status !== SubmissionStatus.PENDING) {
+        await prisma.review.create({
+          data: {
+            submissionId: submission.id,
+            mentorId: mentor.id,
+            decision:
+              status === SubmissionStatus.APPROVED
+                ? ReviewDecision.APPROVED
+                : ReviewDecision.REJECTED,
+            note:
+              status === SubmissionStatus.REJECTED
+                ? "Needs clearer setup instructions for reviewers."
+                : null,
+            reviewedAt: fixedTime,
+          },
+        });
+      }
+      browseSeeds.push({ id: submission.id, projectName: submission.projectName, status });
+    }
+
+    const defaultsMine = await requestJson(baseUrl, "GET", "/api/submissions/mine", {
+      cookie: browseStudent,
+    });
+    assert(defaultsMine.status === 200, "mine defaults expected 200");
+    const defaultsMineBody = defaultsMine.body as MineBody;
+    assert(defaultsMineBody.pagination.page === 1, "default mine page");
+    assert(defaultsMineBody.pagination.pageSize === 10, "default mine pageSize");
+    assert(defaultsMineBody.pagination.total === 12, "default mine total");
+    assert(defaultsMineBody.submissions.length === 10, "default mine page rows");
+    assert(
+      defaultsMineBody.stats.total === 12 &&
+        defaultsMineBody.stats.pending === 5 &&
+        defaultsMineBody.stats.approved === 3 &&
+        defaultsMineBody.stats.rejected === 4,
+      `unexpected owner stats: ${JSON.stringify(defaultsMineBody.stats)}`,
+    );
+
+    const invalidMineQueries: Array<{ query: string; label: string }> = [
+      { query: "page=0", label: "page zero" },
+      { query: "page=-1", label: "page negative" },
+      { query: "page=1.5", label: "page fractional" },
+      { query: "page=abc", label: "page non-numeric" },
+      { query: "pageSize=0", label: "pageSize zero" },
+      { query: "pageSize=51", label: "pageSize over max" },
+      { query: "pageSize=1.2", label: "pageSize fractional" },
+      { query: "status=WAITING", label: "unknown status" },
+      { query: "page=1&page=2", label: "repeated page" },
+      { query: "status=PENDING&status=ALL", label: "repeated status" },
+      { query: `q=${"x".repeat(101)}`, label: "q too long" },
+      { query: "q=alpha&q=beta", label: "repeated q" },
+      { query: "ownerId=forged", label: "unsupported ownerId" },
+      { query: "sort=createdAt", label: "unsupported sort" },
+    ];
+    for (const testCase of invalidMineQueries) {
+      const response = await requestJson(
+        baseUrl,
+        "GET",
+        `/api/submissions/mine?${testCase.query}`,
+        { cookie: browseStudent },
+      );
+      assert(response.status === 400, `${testCase.label} expected 400, got ${response.status}`);
+    }
+
+    const ordered = defaultsMineBody.submissions.map((item) => item.id);
+    const expectedOrder = [...browseSeeds]
+      .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+      .slice(0, 10)
+      .map((item) => item.id);
+    assert(
+      ordered.join(",") === expectedOrder.join(","),
+      `mine ordering mismatch: ${ordered.join(",")} vs ${expectedOrder.join(",")}`,
+    );
+
+    for (const [status, expectedTotal] of [
+      ["ALL", 12],
+      ["PENDING", 5],
+      ["APPROVED", 3],
+      ["REJECTED", 4],
+    ] as const) {
+      const response = await requestJson(
+        baseUrl,
+        "GET",
+        `/api/submissions/mine?status=${status}&pageSize=50`,
+        { cookie: browseStudent },
+      );
+      assert(response.status === 200, `mine ${status} expected 200`);
+      const body = response.body as MineBody;
+      assert(body.pagination.total === expectedTotal, `mine ${status} filtered total`);
+      assert(body.submissions.length === expectedTotal, `mine ${status} row count`);
+      assert(body.stats.total === 12, "owner stats must stay independent of list filters");
+      if (status !== "ALL") {
+        assert(
+          body.submissions.every((item) => item.status === status),
+          `mine ${status} rows must match`,
+        );
+      }
+    }
+
+    const searchMine = await requestJson(
+      baseUrl,
+      "GET",
+      "/api/submissions/mine?q=Alpha&pageSize=50",
+      { cookie: browseStudent },
+    );
+    const searchBody = searchMine.body as MineBody;
+    assert(searchBody.pagination.total === 6, "search Alpha total");
+    assert(
+      searchBody.submissions.every((item) => item.projectName.includes("Alpha")),
+      "search must match project names",
+    );
+    assert(
+      searchBody.submissions.every((item) => item.projectName !== "Student B Only"),
+      "search must stay owner-scoped",
+    );
+
+    const page2 = await requestJson(
+      baseUrl,
+      "GET",
+      "/api/submissions/mine?status=ALL&page=2&pageSize=5",
+      { cookie: browseStudent },
+    );
+    const page2Body = page2.body as MineBody;
+    assert(page2Body.submissions.length === 5, "mine page 2 size");
+    assert(page2Body.pagination.hasPreviousPage === true, "mine page 2 previous");
+    assert(page2Body.pagination.hasNextPage === true, "mine page 2 next");
+
+    const outOfRange = await requestJson(
+      baseUrl,
+      "GET",
+      "/api/submissions/mine?status=ALL&page=99&pageSize=5",
+      { cookie: browseStudent },
+    );
+    const outBody = outOfRange.body as MineBody;
+    assert(outBody.submissions.length === 0, "out-of-range mine page empty");
+    assert(outBody.pagination.total === 12, "out-of-range keeps total");
+    assert(outBody.pagination.page === 99, "out-of-range keeps requested page");
+    assert(outBody.pagination.totalPages === 3, "out-of-range totalPages");
+
+    const emptyFilter = await requestJson(baseUrl, "GET", "/api/submissions/mine?q=zzzz-no-match", {
+      cookie: browseStudent,
+    });
+    const emptyBody = emptyFilter.body as MineBody;
+    assert(emptyBody.submissions.length === 0, "empty search rows");
+    assert(emptyBody.pagination.total === 0 && emptyBody.pagination.totalPages === 0, "empty meta");
+
+    const unauthenticatedMine = await requestJson(baseUrl, "GET", "/api/submissions/mine");
+    assert(unauthenticatedMine.status === 401, "unauthenticated mine must be 401");
+
+    const ownId = browseSeeds[0]!.id;
+    const ownDetail = await requestJson(baseUrl, "GET", `/api/submissions/${ownId}`, {
+      cookie: browseStudent,
+    });
+    assert(ownDetail.status === 200, "owner detail expected 200");
+    assert(ownDetail.headers.get("cache-control")?.includes("no-store"), "detail must be no-store");
+    const ownDetailBody = ownDetail.body as {
+      submission: {
+        id: string;
+        projectName: string;
+        description: string;
+        review: { note: string | null } | null;
+        passwordHash?: string;
+      };
+    };
+    assert(ownDetailBody.submission.id === ownId, "detail id");
+    assert(ownDetailBody.submission.description.length > 0, "detail description");
+    assert(ownDetailBody.submission.passwordHash === undefined, "detail must omit secrets");
+
+    const foreignDetail = await requestJson(
+      baseUrl,
+      "GET",
+      `/api/submissions/${studentBSubmissionId}`,
+      { cookie: browseStudent },
+    );
+    assert(foreignDetail.status === 404, "foreign student detail must be 404");
+
+    const missingDetail = await requestJson(
+      baseUrl,
+      "GET",
+      "/api/submissions/00000000-0000-4000-8000-000000000000",
+      { cookie: browseStudent },
+    );
+    assert(missingDetail.status === 404, "missing detail must be 404");
+
+    const mentorDetail = await requestJson(baseUrl, "GET", `/api/submissions/${ownId}`, {
+      cookie: mentorCookie,
+    });
+    assert(mentorDetail.status === 200, "mentor may read workflow submission");
+
+    const unauthenticatedDetail = await requestJson(baseUrl, "GET", `/api/submissions/${ownId}`);
+    assert(unauthenticatedDetail.status === 401, "unauthenticated detail must be 401");
+
+    const mineAsId = await requestJson(baseUrl, "GET", "/api/submissions/mine", {
+      cookie: browseStudent,
+    });
+    assert(mineAsId.status === 200, "/mine must not be captured as :id");
+
+    const deletedBrowse = await prisma.user.delete({ where: { id: browseUser.id } });
+    assert(deletedBrowse.id === browseUser.id, "browse user deleted");
+    const deletedMine = await requestJson(baseUrl, "GET", "/api/submissions/mine", {
+      cookie: browseStudent,
+    });
+    assert(deletedMine.status === 401, "deleted user mine must be 401");
+    const deletedDetail = await requestJson(baseUrl, "GET", `/api/submissions/${ownId}`, {
+      cookie: browseStudent,
+    });
+    assert(deletedDetail.status === 401, "deleted user detail must be 401");
 
     // Origin protection
     const badOrigin = await requestJson(baseUrl, "POST", "/api/submissions", {

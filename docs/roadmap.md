@@ -147,9 +147,18 @@ Commit: `feat: apply ink-blue shell and Manrope typography`
 
 Commit: `feat: add isolated opt-in demo sandbox`
 
+### U4: Bounded student browsing and project details
+
+- [x] Extend `GET /api/submissions/mine` with validated `page`/`pageSize`/`status`/`q`, owner-scoped PostgreSQL filtering/pagination, and independent owner `stats`.
+- [x] Add `GET /api/submissions/:id` with student ownership / mentor workflow visibility, 404 non-disclosure for students, and `no-store` safe fields.
+- [x] Connect `/student` search, status controls, server pagination, URL state, and `/student/projects/[id]` factual timeline/details.
+- [x] Preserve drafts, duplicates, rate limits, demo isolation, and mentor review workflows.
+- [x] Verify: `check`, `build`, `auth:check`, `submissions:check`, `reviews:check`, `test:e2e` (19 Chromium tests; schema unchanged so `db:check` not required for U4).
+
+Commit: `feat: add bounded student project browsing and details`
+
 ### Remaining upgrade phases
 
-- [ ] U4: Add bounded student search/filter/pagination and authorized project details.
 - [ ] U5: Refine mentor detail loading, review recovery, and workspace usability.
 - [ ] U6: Measure performance and run complete correctness/accessibility regression verification.
 - [ ] U7: Finish final documentation and authorized, evidenced delivery.

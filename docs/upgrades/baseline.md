@@ -60,15 +60,15 @@ Covered by existing assertions (and still holding after U1): current DB user loo
 
 Larger optimization is deferred to U6. Student browse/detail work is deferred to U4/U5.
 
-| Topic                          | Finding                                                                                                                       | Measured?                                                                           |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `GET /api/submissions/mine`    | Unbounded `findMany` for the owner; index `submissions_owner_created_idx` exists                                              | **Unmeasured** response time/size at scale; risk grows with submissions per student |
-| Mentor queue payload           | `queueSubmissionSelect` includes full `description` and review note/checkpoints per row                                       | **Unmeasured** bytes/page under load; intentional for current UI                    |
-| Duplicate / render fetching    | Mentor + project stores dedupe via promise + request sequence; subscribe triggers load                                        | Code review only; no duplicate-network capture in U1                                |
-| Stale / out-of-order responses | Sequence counters discard older responses; draft timers generation-gated                                                      | Covered by design + existing failure e2e paths                                      |
-| Count/page consistency         | Stats separate from filtered queue; out-of-range page → empty rows + stable meta; client may retry last page after mutation   | Integration assertions exist; no load race measurement                              |
-| Indexes / plans                | Owner and status+createdAt indexes present; search uses `contains` ILIKE-style filters (not index-friendly for arbitrary `q`) | **Unmeasured** `EXPLAIN`; search cost labeled risk for large tables                 |
-| Proxy client IP                | Default: Next strips caller forwarding headers; shared Next→Express peer bucket. Opt-in `TRUST_INGRESS_CLIENT_IP`             | e2e `proxy-trust` covers forged XFF; production ingress path unverified             |
+| Topic                          | Finding                                                                                                                       | Measured?                                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `GET /api/submissions/mine`    | **U4:** bounded `page`/`pageSize`/`status`/`q` with PostgreSQL pagination; index `submissions_owner_created_idx` remains      | U4 contract verified in `submissions:check` / e2e; large-scale timing still **unmeasured** (U6) |
+| Mentor queue payload           | `queueSubmissionSelect` includes full `description` and review note/checkpoints per row                                       | **Unmeasured** bytes/page under load; intentional for current UI                                |
+| Duplicate / render fetching    | Mentor + project stores dedupe via promise + request sequence; subscribe triggers load                                        | Code review only; no duplicate-network capture in U1                                            |
+| Stale / out-of-order responses | Sequence counters discard older responses; draft timers generation-gated                                                      | Covered by design + existing failure e2e paths                                                  |
+| Count/page consistency         | Stats separate from filtered queue; out-of-range page → empty rows + stable meta; client may retry last page after mutation   | Integration assertions exist; no load race measurement                                          |
+| Indexes / plans                | Owner and status+createdAt indexes present; search uses `contains` ILIKE-style filters (not index-friendly for arbitrary `q`) | **Unmeasured** `EXPLAIN`; search cost labeled risk for large tables                             |
+| Proxy client IP                | Default: Next strips caller forwarding headers; shared Next→Express peer bucket. Opt-in `TRUST_INGRESS_CLIENT_IP`             | e2e `proxy-trust` covers forged XFF; production ingress path unverified                         |
 
 ## Requested product direction (not missing brief requirements)
 
