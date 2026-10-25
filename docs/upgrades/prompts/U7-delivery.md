@@ -1,0 +1,17 @@
+# Cursor prompt: U7 — documentation and delivery
+
+Work in the existing ReviewDock repository. Execute **Upgrade U7 only**. Read and follow `docs/upgrades/common.md`, the supplied brief, and the completed verification evidence. Finish independent local work before reporting unavailable external inputs.
+
+## Work
+
+1. Update README, API contracts, architecture, decisions, contribution instructions, operations, screenshots, and roadmap to match the final implementation. Remove stale green/font references and redundant/outdated text. Keep copy concise and links runnable. Distinguish original assessment requirements from optional enhancements.
+2. Document Bash and PowerShell setup in the correct order: environment configuration, installation, database startup/migrations, real mentor seeding, app startup, and tests. Separately document guarded public-demo setup with its own database/configuration, advertised synthetic accounts, and shared-account limitations. Never publish real credentials or overwrite existing local environment files.
+3. Verify a fresh isolated checkout/copy with `npm ci --include=dev`, committed migrations, seed, production build/start smoke, and the complete lifecycle. Preserve development data, local secrets, ports, and volumes. Run the full check/build/integration/Playwright suite. Capture actual final desktop/mobile screenshots from synthetic data.
+4. Review the existing CI workflow against the current commands, Node policy, PostgreSQL service, demo-disabled and demo-enabled checks, browser dependencies, cleanup, and failure artifacts. Do not replace a working workflow unnecessarily. Consult official action/library documentation for any required change. Distinguish local passing checks from observed GitHub Actions results.
+5. Document the production topology and remaining operational prerequisites: HTTPS, Secure cookies, private Express, exact trusted Origins, sanitized client IP forwarding, runtime API_INTERNAL_URL, ingress body/time limits, migrations/seed ordering, backup/restore drills, monitoring, load expectations, per-process limits, and copied-token lifetime.
+6. Inspect Git status/remotes and connected access. If the intended repository exists and pushing is authorized, push normally without force, verify the intended commit is reachable, inspect actual CI, and fix failures. Do not invent an account/repository/visibility/deadline or deploy to an unspecified target. If inputs remain missing, finish local work and leave those exact delivery items open.
+7. Follow the actual assessment deadline before making the repository public and verify signed-out reachability when authorized and appropriate. The supplied brief makes reachability a disqualification condition. Do not mark public access or deadline compliance verified without observing it. Detailed requirements for the two lessons are still missing: retain the runbook and request those inputs rather than inventing lesson duration/topics or recording unrelated videos.
+
+## Completion
+
+Report implemented requirements, added useful features, exact setup/demo/test commands, actual results, browser/manual findings, screenshot locations, measured performance evidence, and operational limitations. Separate locally verified work, configured CI, observed CI, deployed public demo, repository reachability/publication, and video delivery. Commit verified changes professionally. Stop here; do not invent a further feature phase or begin the lessons without their instructions.

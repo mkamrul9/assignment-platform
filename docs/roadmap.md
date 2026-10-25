@@ -110,6 +110,18 @@ Possible commits: `test: cover the submission and review lifecycle`, `ci: verify
 
 The supplied brief mentions two videos but does not include the lesson requirements. A technical recording runbook lives under `docs/videos/`. Lesson topics and durations stay undecided until Part 2 instructions arrive.
 
+## Requested product upgrades (planned)
+
+Copy-ready execution prompts and shared constraints live in [the upgrade guide](upgrades/README.md). These phases are planned, not implemented or verified by preparing the prompts. Preserve the completed history above.
+
+- [ ] U1: Audit the supplied assessment requirements and establish a current baseline.
+- [ ] U2: Apply the blue/neutral visual system, Manrope, shared navbar/footer, and responsive shell.
+- [ ] U3: Add a guarded public-demo sandbox and synthetic auth-screen accounts.
+- [ ] U4: Add bounded student search/filter/pagination and authorized project details.
+- [ ] U5: Refine mentor detail loading, review recovery, and workspace usability.
+- [ ] U6: Measure performance and run complete correctness/accessibility regression verification.
+- [ ] U7: Finish final documentation and authorized, evidenced delivery.
+
 ## Working agreement
 
 - Finish and verify the current phase before starting the next one.
