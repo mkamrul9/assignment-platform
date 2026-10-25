@@ -24,7 +24,8 @@
     "demo:prepare": "tsx prisma/demo-prepare.ts",
     "demo:seed": "tsx prisma/demo-seed.ts",
     "demo:reset": "tsx prisma/demo-reset.ts",
-    "demo:check": "tsx tests/demo.check.ts"
+    "demo:check": "tsx tests/demo.check.ts",
+    "perf:check": "tsx tests/perf.check.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",

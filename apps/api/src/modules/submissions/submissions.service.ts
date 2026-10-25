@@ -188,15 +188,22 @@ export async function listMySubmissions(
   };
 }
 
-/** Owner-scoped totals independent of list filters/search. */
+/** Owner-scoped totals independent of list filters/search (single groupBy round trip). */
 export async function getMySubmissionStats(ownerId: string): Promise<OwnerSubmissionStats> {
-  const [pending, approved, rejected, total] = await Promise.all([
-    prisma.submission.count({ where: { ownerId, status: SubmissionStatus.PENDING } }),
-    prisma.submission.count({ where: { ownerId, status: SubmissionStatus.APPROVED } }),
-    prisma.submission.count({ where: { ownerId, status: SubmissionStatus.REJECTED } }),
-    prisma.submission.count({ where: { ownerId } }),
-  ]);
-  return { pending, approved, rejected, total };
+  const groups = await prisma.submission.groupBy({
+    by: ["status"],
+    where: { ownerId },
+    _count: { _all: true },
+  });
+  const stats: OwnerSubmissionStats = { pending: 0, approved: 0, rejected: 0, total: 0 };
+  for (const group of groups) {
+    const count = group._count._all;
+    stats.total += count;
+    if (group.status === SubmissionStatus.PENDING) stats.pending = count;
+    if (group.status === SubmissionStatus.APPROVED) stats.approved = count;
+    if (group.status === SubmissionStatus.REJECTED) stats.rejected = count;
+  }
+  return stats;
 }
 
 /**

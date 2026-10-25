@@ -61,6 +61,8 @@ model Submission {
 
   @@index([ownerId, createdAt(sort: Desc), id(sort: Desc)], map: "submissions_owner_created_idx")
   @@index([status, createdAt(sort: Desc), id(sort: Desc)], map: "submissions_status_created_idx")
+  // Supports mentor ALL / newest-first pages without a status predicate (measured Seq Scan in U6).
+  @@index([createdAt(sort: Desc), id(sort: Desc)], map: "submissions_created_idx")
   @@map("submissions")
 }
 
