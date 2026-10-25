@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { createAuthRouter } from "./modules/auth/auth.routes.js";
+import { createDemoRouter } from "./modules/demo/demo.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
 import { createReviewsRouter } from "./modules/reviews/reviews.routes.js";
 import { createSubmissionsRouter } from "./modules/submissions/submissions.routes.js";
@@ -31,6 +32,11 @@ export function createApp() {
   app.use("/api/auth", createAuthRouter());
   app.use("/api/submissions", createSubmissionsRouter());
   app.use("/api/reviews", createReviewsRouter());
+
+  // Only mount demo metadata when explicitly enabled so disabled mode yields a real 404.
+  if (env.DEMO_MODE) {
+    app.use("/api/demo", createDemoRouter());
+  }
 
   if (env.NODE_ENV === "test") {
     app.use("/api/test", roleBoundaryRouter);

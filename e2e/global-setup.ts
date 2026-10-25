@@ -147,6 +147,11 @@ export default async function globalSetup() {
       password: MENTOR_PASSWORD,
     });
     await seedFixtures(databaseUrl);
+
+    // Synthetic demo identities for auth-panel coverage (not the development DB).
+    const { seedDemoAccountsForE2E } = await import("./demo-seed.js");
+    await seedDemoAccountsForE2E(databaseUrl);
+
     api = spawnLogged(process.execPath, ["dist/server.js"], {
       cwd: apiRoot,
       logName: "api",
@@ -161,6 +166,7 @@ export default async function globalSetup() {
         WEB_ORIGINS: webOrigins,
         TRUST_PROXY: "1",
         SESSION_COOKIE_NAME: "reviewdock_session",
+        DEMO_MODE: "1",
         // Shared Next→Express peer IP; raise signup so the full suite can create accounts.
         // Keep the default login limit so proxy-trust can still observe shared IP buckets.
         SIGNUP_RATE_LIMIT_MAX: "100",

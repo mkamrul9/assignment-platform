@@ -71,6 +71,10 @@ Schedule PostgreSQL backups outside the application container/volume, protect th
 
 Monitor API availability, error rates, latency, database pool saturation, and backup results. Choose and configure the hosting platform's structured logs, alerting, and retention before launch; this repository does not provision observability infrastructure.
 
+## Public demo hosting
+
+If you expose a visitor demo, use a **separate** deployment with its own `reviewdock_demo*` database, `DEMO_MODE=1`, demo JWT secret, and web origin. Never enable demo mode against the development or production user database. Advertised demo passwords are synthetic sample data; they must not be the real `MENTOR_PASSWORD`. Prefer a trusted ingress that replaces `X-Forwarded-For` and `TRUST_INGRESS_CLIENT_IP=1` so login/signup limits are per client. There is no public data-reset API; operators may run `npm run demo:reset` only against the allowlisted sandbox after reviewing its destructive scope. Local `demo:dev` does not publish the service on the internet.
+
 ## What is and is not established
 
 The local checks establish the implemented application lifecycle, permission boundaries, database constraints/transactions, Chromium interactions, and production compilation. A real release additionally needs an observed green GitHub Actions run, an authorized hosting target, HTTPS/proxy verification, tested backups, monitoring, and capacity/load testing for the expected traffic. Firefox/WebKit and screen-reader testing are not part of the current browser suite.

@@ -34,6 +34,14 @@ const envSchema = z.object({
     .default("0")
     .transform((value) => value === "1" || value === "true"),
   SESSION_COOKIE_NAME: z.string().min(1).default("reviewdock_session"),
+  /**
+   * Opt-in public demo sandbox. When enabled, GET /api/demo/accounts exposes
+   * intentionally synthetic credentials. Keep disabled for normal development.
+   */
+  DEMO_MODE: z
+    .enum(["0", "1", "true", "false"])
+    .default("0")
+    .transform((value) => value === "1" || value === "true"),
 });
 
 export const env = envSchema.parse(process.env);

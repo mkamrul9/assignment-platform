@@ -104,9 +104,31 @@ npm run db:check             # Disposable PostgreSQL persistence checks
 npm run auth:check           # Auth, cookies, roles, Origin, limits
 npm run submissions:check    # Validation, ownership, duplicate races, limits
 npm run reviews:check        # Queue/search, stats, decisions, races, rollback
+npm run demo:check           # Demo guards, seed idempotence, metadata, logins
 npm run test:e2e             # Build, then run Chromium browser checks
 npm run test:e2e:ui          # Build, then open the Playwright UI
+
+npm run demo:prepare         # Create allowlisted demo DB, migrate, seed fixtures
+npm run demo:seed            # Idempotent demo fixture seed (requires DEMO_MODE=1)
+npm run demo:reset           # DESTRUCTIVE: rebuild only the demo sandbox database
+npm run demo:dev             # Run API+web using apps/api/.env.demo (ports 4001/3001)
 ```
+
+### Optional isolated demo sandbox
+
+Demo mode is **off by default**. It never uses the development database name `reviewdock`. Copy the demo env examples, point `DATABASE_URL` at `reviewdock_demo` (same Postgres server is fine; keep your existing port), then:
+
+```sh
+cp apps/api/.env.demo.example apps/api/.env.demo
+cp apps/web/.env.demo.example apps/web/.env.demo.local
+# Edit host ports in those files to match your Compose POSTGRES_PORT if needed.
+npm run demo:prepare
+npm run demo:dev
+```
+
+Open the demo web origin (default [localhost:3001](http://localhost:3001)). Login and signup show shared synthetic accounts from `GET /api/demo/accounts`. Authentication still uses normal Express login, JWT cookies, Origin checks, and rate limits. Visitors sharing a demo student share that account’s projects and submission rate bucket; mentor decisions are final inside the sandbox. Local demo setup does not publish the app on the internet. `demo:reset` drops only an allowlisted `reviewdock_demo*` database.
+
+When `DEMO_MODE=0`, the demo panel is hidden and `/api/demo/accounts` is not mounted (404).
 
 Run `check`, `build`, and the test suites sequentially against the same checkout; simultaneous Prisma generation can race. `check` includes integration checks, Prisma seed/configuration, and Playwright tooling through `tsconfig.tooling.json` and the tooling lint command.
 

@@ -96,6 +96,7 @@ POST   /api/auth/signup
 POST   /api/auth/login
 POST   /api/auth/logout
 GET    /api/auth/me
+GET    /api/demo/accounts          # only when DEMO_MODE=1; otherwise absent/404
 POST   /api/submissions
 GET    /api/submissions/mine
 GET    /api/reviews/submissions?page&pageSize&status&q

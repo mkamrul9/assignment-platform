@@ -11,22 +11,55 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { safeReturnPath, workspacePathForRole } from "@/lib/safe-return-path";
 
 import { useAuth } from "./auth-context";
+import { takePendingDemoFill } from "./demo-fill";
 import type { AuthUser } from "./types";
 
 type Mode = "login" | "signup";
 
 type FieldErrors = Partial<Record<"name" | "email" | "password" | "form", string>>;
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export type AuthFormCredentials = { email: string; password: string };
+
+function initialLoginCredentials(prefill?: AuthFormCredentials | null): AuthFormCredentials {
+  const pending = takePendingDemoFill();
+  if (pending) {
+    return pending;
+  }
+  if (prefill) {
+    return prefill;
+  }
+  return { email: "", password: "" };
+}
+
+export function AuthForm({
+  mode,
+  prefill,
+}: {
+  mode: Mode;
+  /** Optional credentials from the demo panel (login only). */
+  prefill?: AuthFormCredentials | null;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setUser } = useAuth();
 
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [loginSeed] = useState(() =>
+    mode === "login" ? initialLoginCredentials(prefill) : { email: "", password: "" },
+  );
+  const [email, setEmail] = useState(loginSeed.email);
+  const [password, setPassword] = useState(loginSeed.password);
+  const [appliedPrefill, setAppliedPrefill] = useState<AuthFormCredentials | null>(
+    mode === "login" ? (prefill ?? null) : null,
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+
+  if (mode === "login" && prefill && prefill !== appliedPrefill) {
+    setAppliedPrefill(prefill);
+    setEmail(prefill.email);
+    setPassword(prefill.password);
+  }
 
   const nextPath = useMemo(() => safeReturnPath(searchParams.get("next")), [searchParams]);
 

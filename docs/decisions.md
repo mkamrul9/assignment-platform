@@ -48,6 +48,10 @@ Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, a
 
 ReviewDock uses ink-blue primary actions, off-white and light-slate surfaces, dark readable text, and restrained amber accents. Semantic green and red remain for success and failure statuses and always appear with text labels. Typography is self-hosted Manrope with a system-ui fallback via `next/font/local` (OFL; no runtime Google Fonts requests). Shared navbar and footer provide role-aware destinations across public, auth, and workspace pages. Prioritize forms, queues, accessible controls, and honest empty states over decoration.
 
+## Public demo sandbox
+
+An optional demo mode (`DEMO_MODE=1`) serves intentionally public synthetic accounts on login/signup through `GET /api/demo/accounts`. It requires a dedicated allowlisted database (`reviewdock_demo` or `reviewdock_demo_*`) and separate env files. Demo seeding is idempotent, never promotes roles, and does not overwrite existing fixture passwords or completed reviews. There is no public reset endpoint and no automatic reset on startup; `npm run demo:reset` is a guarded, destructive rebuild of the sandbox database only. Shared demo students share records and submission rate limits; mentor decisions are real and final within the sandbox. Accurate public per-IP login/signup limits still need the documented sanitizing ingress. Local demo configuration does not imply internet accessibility.
+
 ## Delivery
 
 Keep the repository private initially if needed, then make it public after the submission deadline as the assessment requires. Do not invent a deadline: none was supplied. GitHub hosting, production deployment, and the two video lessons belong to later phases.

@@ -7,6 +7,7 @@ Browser requests use the web origin's relative `/api` routes. The examples below
 - `POST /api/auth/signup`: `{ name, email, password }` -> `201 { user }`; always creates a student and sets the cookie. Name is trimmed, email is normalized, privileged/unknown fields are rejected, duplicate email is `409`.
 - `POST /api/auth/login`: `{ email, password }` -> `200 { user }` and cookie. Unknown email and incorrect password share the same `401` error.
 - `GET /api/auth/me`: `200 { user }` or `401`. Safe user fields: `id`, `name`, `email`, `role`, `createdAt`. Tokens and password hashes never appear in JSON.
+- `GET /api/demo/accounts`: only when `DEMO_MODE=1`; `200 { notice, accounts }` with intentionally public synthetic emails/passwords. Absent/404 when demo mode is off. Never includes real mentor credentials, JWT secrets, or database URLs.
 - `POST /api/auth/logout`: `204`, clearing the cookie even if it is missing/expired. Signup, login, logout, submissions, and decisions require an exact trusted `Origin`.
 - `POST /api/submissions`: student only; `{ projectName, repositoryUrl, liveUrl, description }` -> `201 { submission }`, initially `PENDING`. Unknown/privileged fields are rejected. Repository duplicates return `409` without identifying another student.
 - `GET /api/submissions/mine`: student only; `200 { submissions }`. Ownership comes from the session, not query parameters. Rows are newest first by `createdAt`, then `id`, both descending. Includes stored review decision, note, checkpoints, and timestamp when available.

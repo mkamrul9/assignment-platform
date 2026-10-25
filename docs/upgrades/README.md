@@ -20,7 +20,7 @@ ReviewDock should feel like a compact working product. Keep the useful existing 
 
 U2 applies ink-blue actions, off-white/light-slate surfaces, restrained amber accents, and self-hosted Manrope; reserve semantic green/red for readable result statuses. Keep typography practical and controls accessible. Every primary navigation/footer link must lead somewhere implemented. Use concise task-focused copy, not promotional filler or implementation explanations.
 
-Demo accounts must be deliberately public **synthetic** identities in an opt-in sandbox. Their credentials may be displayed only in that mode. The existing seeded mentor and any real student data must remain private. Public demo hosting uses its own database and configuration.
+U3 adds deliberately public **synthetic** identities in an opt-in sandbox (`DEMO_MODE`, `reviewdock_demo*`). Their credentials may be displayed only in that mode. The existing seeded mentor and any real student data must remain private. Public demo hosting uses its own database and configuration.
 
 ## What the brief actually requires
 

@@ -137,9 +137,18 @@ Commits: `fix: reject over-long passwords on login`; `fix: sync mentor queue URL
 
 Commit: `feat: apply ink-blue shell and Manrope typography`
 
+### U3: Isolated opt-in demo sandbox
+
+- [x] Opt-in `DEMO_MODE` with allowlisted `reviewdock_demo*` database guards; separate `.env.demo` / demo ports; development data preserved.
+- [x] Idempotent synthetic seed: two students, one mentor, ≥25 submissions with reviews; collision failures; passwords hashed; no password overwrite on re-seed.
+- [x] Auth-screen demo panel via `GET /api/demo/accounts` (404 when disabled); signup selection routes to login; no credentials in URLs/storage.
+- [x] Normal Express auth, cookies, Origin, RBAC, and rate limits retained; documented shared-account and ingress limitations.
+- [x] Verify: `check`, `build`, `db:check`, `auth:check`, `submissions:check`, `reviews:check`, `demo:check`, `test:e2e` (17 Chromium tests including demo panel).
+
+Commit: `feat: add isolated opt-in demo sandbox`
+
 ### Remaining upgrade phases
 
-- [ ] U3: Add a guarded public-demo sandbox and synthetic auth-screen accounts.
 - [ ] U4: Add bounded student search/filter/pagination and authorized project details.
 - [ ] U5: Refine mentor detail loading, review recovery, and workspace usability.
 - [ ] U6: Measure performance and run complete correctness/accessibility regression verification.
