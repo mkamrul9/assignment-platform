@@ -18,7 +18,7 @@ Give Cursor the full contents of **one** prompt at a time, starting with U1. Eac
 
 ReviewDock should feel like a compact working product. Keep the useful existing features: drafts, queue search, server-side filters/pagination, checkpoint feedback, and atomic decisions. Add bounded student project browsing and an authorized project-details view with a factual submission/review timeline. Avoid unrelated features that create more unfinished flows.
 
-Use ink-blue actions, off-white/light-slate surfaces, and restrained amber accents; reserve semantic green/red for readable result statuses. Use self-hosted Manrope with a system fallback, replacing the current Segoe UI/Georgia pairing. Keep typography practical and controls accessible. Every primary navigation/footer link must lead somewhere implemented. Use concise task-focused copy, not promotional filler or implementation explanations.
+U2 applies ink-blue actions, off-white/light-slate surfaces, restrained amber accents, and self-hosted Manrope; reserve semantic green/red for readable result statuses. Keep typography practical and controls accessible. Every primary navigation/footer link must lead somewhere implemented. Use concise task-focused copy, not promotional filler or implementation explanations.
 
 Demo accounts must be deliberately public **synthetic** identities in an opt-in sandbox. Their credentials may be displayed only in that mode. The existing seeded mentor and any real student data must remain private. Public demo hosting uses its own database and configuration.
 

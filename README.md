@@ -2,7 +2,7 @@
 
 A project submission and review workspace for students and mentors.
 
-Students sign up, draft and submit projects, and see review feedback. Mentors search and paginate the queue, see global totals, and approve or reject pending projects with notes and optional functionality/usability/documentation checkpoints.
+Students sign up, draft and submit projects, and see review feedback. Mentors search and paginate the queue, see global totals, and approve or reject pending projects with notes and optional functionality/usability/documentation checkpoints. The UI uses ink-blue actions, neutral surfaces, and self-hosted Manrope across a shared navbar and footer.
 
 The application is implemented and covered by local integration and Chromium browser checks. GitHub delivery and observed Actions CI remain pending. Deployment verification is separate from local test results; see [operations and release readiness](docs/operations.md).
 

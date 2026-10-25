@@ -46,7 +46,7 @@ Limits are 10 login attempts per 15 minutes per IP, 5 signups per hour per IP, a
 
 ## Presentation
 
-ReviewDock uses warm neutral surfaces, dark green accents, and a compact, readable workspace. The useful distinction is visible review feedback and a clear account of each project's current state. Prioritize forms, queues, accessible controls, and honest empty states over decoration.
+ReviewDock uses ink-blue primary actions, off-white and light-slate surfaces, dark readable text, and restrained amber accents. Semantic green and red remain for success and failure statuses and always appear with text labels. Typography is self-hosted Manrope with a system-ui fallback via `next/font/local` (OFL; no runtime Google Fonts requests). Shared navbar and footer provide role-aware destinations across public, auth, and workspace pages. Prioritize forms, queues, accessible controls, and honest empty states over decoration.
 
 ## Delivery
 

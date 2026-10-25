@@ -348,11 +348,14 @@ export function MentorQueue() {
               ["Total", stats.stats.total],
             ] as const
           ).map(([label, value]) => (
-            <div key={label} className="rounded-lg border bg-card px-4 py-4">
+            <div key={label} className="rounded-lg border border-border bg-card px-4 py-4">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {label}
               </p>
-              <p className="mt-2 font-serif text-3xl tracking-tight">
+              <p
+                data-stat-value={label.toLowerCase()}
+                className="mt-2 text-3xl font-semibold tracking-tight tabular-nums"
+              >
                 {stats.status === "loading" ? "…" : value}
               </p>
             </div>
@@ -442,15 +445,15 @@ export function MentorQueue() {
         ) : null}
 
         {queue.status === "ready" && queue.submissions.length === 0 ? (
-          <div className="rounded-lg border bg-card px-5 py-6 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-card px-5 py-6 text-sm text-muted-foreground">
             {q ? "No projects match this search and filter." : "No projects match this filter."}
           </div>
         ) : null}
 
         {queue.status === "ready" && queue.submissions.length > 0 ? (
-          <div className="overflow-x-auto rounded-lg border bg-card">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b bg-secondary/40 text-xs tracking-wide text-muted-foreground uppercase">
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+            <table className="min-w-[40rem] w-full text-left text-sm">
+              <thead className="border-b border-border bg-secondary/50 text-xs tracking-wide text-muted-foreground uppercase">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-medium">
                     Project
@@ -471,9 +474,11 @@ export function MentorQueue() {
               </thead>
               <tbody>
                 {queue.submissions.map((submission) => (
-                  <tr key={submission.id} className="border-b last:border-b-0">
-                    <td className="px-4 py-3 align-top">
-                      <div className="font-medium text-foreground">{submission.projectName}</div>
+                  <tr key={submission.id} className="border-b border-border last:border-b-0">
+                    <td className="max-w-[16rem] px-4 py-3 align-top">
+                      <div className="truncate font-medium text-foreground">
+                        {submission.projectName}
+                      </div>
                       <div className="mt-1 flex flex-wrap gap-3 text-xs">
                         <a
                           href={submission.repositoryUrl}
@@ -493,12 +498,16 @@ export function MentorQueue() {
                         </a>
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-top">
-                      <div>{submission.owner.name}</div>
-                      <div className="text-xs text-muted-foreground">{submission.owner.email}</div>
+                    <td className="max-w-[12rem] px-4 py-3 align-top">
+                      <div className="truncate">{submission.owner.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">
+                        {submission.owner.email}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 align-top">{statusLabel(submission.status)}</td>
-                    <td className="px-4 py-3 align-top text-muted-foreground">
+                    <td className="px-4 py-3 align-top whitespace-nowrap">
+                      {statusLabel(submission.status)}
+                    </td>
+                    <td className="px-4 py-3 align-top whitespace-nowrap text-muted-foreground">
                       {formatDate(submission.createdAt)}
                     </td>
                     <td className="px-4 py-3 align-top">

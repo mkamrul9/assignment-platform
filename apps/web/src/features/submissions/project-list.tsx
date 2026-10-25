@@ -8,6 +8,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 
 import { checkpointLabel, CHECKPOINT_FIELDS } from "@/features/reviews/checkpoint-labels";
 
+import { StatusBadge } from "./status-badge";
 import type { Submission } from "./types";
 
 type ListState =
@@ -89,19 +90,6 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function statusLabel(status: Submission["status"]): string {
-  switch (status) {
-    case "PENDING":
-      return "Pending review";
-    case "APPROVED":
-      return "Approved";
-    case "REJECTED":
-      return "Rejected";
-    default:
-      return status;
-  }
-}
-
 export function ProjectList() {
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -129,7 +117,7 @@ export function ProjectList() {
 
   if (state.submissions.length === 0) {
     return (
-      <div className="rounded-lg border bg-card px-5 py-6">
+      <div className="rounded-lg border border-border bg-card px-5 py-6">
         <p className="text-sm leading-6 text-muted-foreground">
           You have not submitted a project yet. Add a repository, live link, and short description
           to get started.
@@ -144,27 +132,27 @@ export function ProjectList() {
   return (
     <ul className="space-y-4">
       {state.submissions.map((submission) => (
-        <li key={submission.id} className="rounded-lg border bg-card px-5 py-5">
+        <li key={submission.id} className="rounded-lg border border-border bg-card px-5 py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">{submission.projectName}</h2>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold tracking-tight">
+                {submission.projectName}
+              </h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Submitted {formatDate(submission.createdAt)}
               </p>
             </div>
-            <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground">
-              {statusLabel(submission.status)}
-            </span>
+            <StatusBadge status={submission.status} />
           </div>
 
-          <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+          <p className="mt-4 max-w-prose whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
             {submission.description}
           </p>
 
           <div className="mt-4 flex flex-wrap gap-4 text-sm">
             <a
               href={submission.repositoryUrl}
-              className="font-medium text-primary underline-offset-4 hover:underline"
+              className="max-w-full truncate font-medium text-primary underline-offset-4 hover:underline"
               rel="noreferrer"
               target="_blank"
             >
@@ -172,7 +160,7 @@ export function ProjectList() {
             </a>
             <a
               href={submission.liveUrl}
-              className="font-medium text-primary underline-offset-4 hover:underline"
+              className="max-w-full truncate font-medium text-primary underline-offset-4 hover:underline"
               rel="noreferrer"
               target="_blank"
             >
@@ -181,7 +169,7 @@ export function ProjectList() {
           </div>
 
           {submission.review ? (
-            <div className="mt-4 rounded-md border bg-background px-4 py-3 text-sm">
+            <div className="mt-4 rounded-md border border-border bg-muted/40 px-4 py-3 text-sm">
               <p className="font-medium">
                 Review: {submission.review.decision === "APPROVED" ? "Approved" : "Rejected"}
               </p>

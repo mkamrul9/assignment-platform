@@ -126,9 +126,19 @@ Copy-ready execution prompts and shared constraints live in [the upgrade guide](
 
 Commits: `fix: reject over-long passwords on login`; `fix: sync mentor queue URL after page recovery`
 
+### U2: Visual system and application shell
+
+- [x] Replace green/Georgia–Segoe treatment with ink-blue actions, off-white/light-slate surfaces, amber accents, and semantic status colors with text labels.
+- [x] Self-host Manrope via `next/font/local` (OFL notice under `apps/web/src/app/fonts/`); no runtime Google Fonts dependency.
+- [x] Shared `AppShell` navbar/footer across home, auth, and workspace; role-aware links; mobile Menu while keeping workspace return visible.
+- [x] Refine homepage, login/signup, and student/mentor workspace presentation without changing API contracts or adding demo accounts.
+- [x] Verify: `npm run check`, `npm run build`, `npm run test:e2e` (13 Chromium tests). Synthetic screenshots refreshed via lifecycle e2e.
+- [x] Manual visual inspection of contrast/overflow not separately recorded; Chromium automation covered desktop and 390px mobile paths.
+
+Commit: `feat: apply ink-blue shell and Manrope typography`
+
 ### Remaining upgrade phases
 
-- [ ] U2: Apply the blue/neutral visual system, Manrope, shared navbar/footer, and responsive shell.
 - [ ] U3: Add a guarded public-demo sandbox and synthetic auth-screen accounts.
 - [ ] U4: Add bounded student search/filter/pagination and authorized project details.
 - [ ] U5: Refine mentor detail loading, review recovery, and workspace usability.

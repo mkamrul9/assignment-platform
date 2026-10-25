@@ -66,13 +66,16 @@ export function ReviewDialog({
         <form className="space-y-5 p-6" onSubmit={(event) => event.preventDefault()}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">
+              <p className="text-xs font-semibold tracking-wide text-primary uppercase">
                 {statusLabel(selected.status)}
               </p>
-              <h3 id={dialogTitleId} className="mt-2 font-serif text-2xl tracking-tight">
+              <h3
+                id={dialogTitleId}
+                className="mt-2 break-words text-2xl font-semibold tracking-tight"
+              >
                 {selected.projectName}
               </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 break-words text-sm text-muted-foreground">
                 {selected.owner.name} · {selected.owner.email}
               </p>
             </div>
@@ -87,7 +90,7 @@ export function ReviewDialog({
             </Button>
           </div>
 
-          <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+          <p className="max-w-prose whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
             {selected.description}
           </p>
 

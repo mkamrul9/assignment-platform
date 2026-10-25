@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <div className="w-full max-w-md rounded-xl border bg-card px-6 py-8 shadow-xs sm:px-8">
-      <h1 className="font-serif text-3xl tracking-tight">Welcome back</h1>
+    <div className="w-full max-w-md rounded-xl border border-border bg-card px-6 py-8 sm:px-8">
+      <h1 className="text-3xl font-semibold tracking-tight">Welcome back</h1>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Sign in as a student or mentor to continue.
+        Sign in with your student or mentor account to open your workspace.
       </p>
       <div className="mt-8">
         <Suspense fallback={<p className="text-sm text-muted-foreground">Loading form…</p>}>

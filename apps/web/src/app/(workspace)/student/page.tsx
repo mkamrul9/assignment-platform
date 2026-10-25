@@ -12,14 +12,14 @@ export default function StudentWorkspacePage() {
       {(user) => (
         <section className="max-w-3xl">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">
-                Student workspace
-              </p>
-              <h1 className="mt-4 font-serif text-4xl tracking-tight">Hello, {user.name}</h1>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold tracking-wide text-primary">Student workspace</p>
+              <h1 className="mt-3 truncate text-3xl font-semibold tracking-tight sm:text-4xl">
+                Hello, {user.name}
+              </h1>
               <p className="mt-3 max-w-xl text-base leading-7 text-muted-foreground">
-                Submit a project for review and track its status here. Feedback appears once a
-                mentor decides.
+                Submit a project and track its review status. Feedback appears after a mentor
+                decides.
               </p>
             </div>
             <Button asChild size="lg">

@@ -25,12 +25,13 @@ apps/
           student/submit/page.tsx
           mentor/page.tsx
         api/[...path]/route.ts    Proxy to Express with Origin/Cookie forwarding
-        globals.css
+        fonts/                    Self-hosted Manrope (OFL) + localFont loader
+        globals.css               Design tokens (ink-blue / neutrals / amber)
         layout.tsx
         page.tsx
       components/
         ui/                       shadcn/ui primitives
-        layout/                   Shared header / navigation
+        layout/                   AppShell, navbar, footer (shared chrome)
       features/
         auth/                     Session provider, forms, guards
         submissions/              Submit form and project list

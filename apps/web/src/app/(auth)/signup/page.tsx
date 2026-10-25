@@ -9,10 +9,10 @@ export const metadata: Metadata = {
 
 export default function SignupPage() {
   return (
-    <div className="w-full max-w-md rounded-xl border bg-card px-6 py-8 shadow-xs sm:px-8">
-      <h1 className="font-serif text-3xl tracking-tight">Create a student account</h1>
+    <div className="w-full max-w-md rounded-xl border border-border bg-card px-6 py-8 sm:px-8">
+      <h1 className="text-3xl font-semibold tracking-tight">Create a student account</h1>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Mentors are invited separately. Public signup always creates a student workspace.
+        Public signup creates a student workspace. Mentors are seeded separately.
       </p>
       <div className="mt-8">
         <Suspense fallback={<p className="text-sm text-muted-foreground">Loading form…</p>}>

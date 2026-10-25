@@ -1,87 +1,61 @@
 import Link from "next/link";
 
-import { SiteHeader } from "@/components/layout/site-header";
+import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 
 const workflow = [
   {
-    number: "01",
-    title: "Bring your work.",
-    description:
-      "A repository, a live demo, and the story behind what you built. One place for all of it.",
+    title: "Submit a project",
+    description: "Students share a repository, live demo, and short description for mentor review.",
   },
   {
-    number: "02",
-    title: "Give it a thoughtful review.",
+    title: "Review the queue",
     description:
-      "A focused queue helps mentors see what needs attention and make a clear decision.",
+      "Mentors filter, search, and paginate pending work, then approve or reject with notes.",
   },
   {
-    number: "03",
-    title: "Know where you stand.",
-    description:
-      "A visible status and useful feedback keep students from wondering what happens next.",
+    title: "See the outcome",
+    description: "Students get a clear status, optional checkpoints, and actionable feedback.",
   },
 ];
 
 export default function HomePage() {
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6 sm:px-10">
-      <a
-        href="#main"
-        className="sr-only z-10 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:absolute focus:top-4"
-      >
-        Skip to content
-      </a>
-
-      <SiteHeader />
-
-      <main id="main" className="flex-1">
-        <section className="max-w-3xl py-20 sm:py-28">
-          <p className="mb-7 text-xs font-semibold tracking-[0.18em] text-primary uppercase">
-            Student projects. Thoughtful feedback.
-          </p>
-          <h1 className="max-w-2xl font-serif text-5xl leading-[1.08] tracking-tight sm:text-7xl">
-            Good work deserves a clear next step.
-          </h1>
-          <p className="mt-7 max-w-xl text-lg leading-8 text-muted-foreground">
-            A shared space for students to submit what they have built, and for mentors to help move
-            it forward.
-          </p>
-          <div className="mt-9 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link href="/signup">Create a student account</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/login">Sign in</Link>
-            </Button>
-          </div>
-        </section>
-
-        <section
-          id="workflow"
-          aria-label="How ReviewDock works"
-          className="grid scroll-mt-8 gap-8 border-t py-10 sm:grid-cols-3 sm:gap-10"
-        >
-          {workflow.map((step) => (
-            <article key={step.number}>
-              <span className="font-mono text-xs text-primary">{step.number} /</span>
-              <h2 className="mt-4 text-lg font-semibold tracking-tight">{step.title}</h2>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{step.description}</p>
-            </article>
-          ))}
-        </section>
-
-        <p className="mb-12 rounded-lg border bg-card px-5 py-4 text-sm leading-6 text-muted-foreground">
-          Students can submit a project and track its status. Mentors can search the queue, leave a
-          decision, and share checkpoint feedback.
+    <AppShell mainClassName="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-8 sm:py-14">
+      <section className="max-w-2xl">
+        <p className="text-sm font-semibold tracking-wide text-primary">Project review workspace</p>
+        <h1 className="mt-4 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+          ReviewDock helps students submit projects and mentors decide with clear feedback.
+        </h1>
+        <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">
+          Sign up as a student to submit work, or sign in with a seeded mentor account to manage the
+          review queue.
         </p>
-      </main>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Button asChild size="lg">
+            <Link href="/signup">Create a student account</Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/login">Sign in</Link>
+          </Button>
+        </div>
+      </section>
 
-      <footer className="flex flex-wrap justify-between gap-3 border-t py-6 text-xs text-muted-foreground">
-        <span>ReviewDock</span>
-        <span>A little structure. A better review.</span>
-      </footer>
-    </div>
+      <section
+        id="workflow"
+        aria-label="How ReviewDock works"
+        className="mt-16 grid gap-8 border-t border-border pt-10 sm:grid-cols-3 sm:gap-10"
+      >
+        {workflow.map((step, index) => (
+          <article key={step.title}>
+            <p className="text-xs font-semibold tracking-wide text-accent-foreground uppercase">
+              Step {index + 1}
+            </p>
+            <h2 className="mt-3 text-lg font-semibold tracking-tight">{step.title}</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{step.description}</p>
+          </article>
+        ))}
+      </section>
+    </AppShell>
   );
 }

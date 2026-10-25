@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { e2eState, login, mentorLogin, uniqueEmail, signupStudent } from "./helpers";
+import { e2eState, login, logout, mentorLogin, uniqueEmail, signupStudent } from "./helpers";
 
 test("keyboard, dialog focus, mobile layout, and failure recovery", async ({ browser, page }) => {
   const state = e2eState();
@@ -11,9 +11,8 @@ test("keyboard, dialog focus, mobile layout, and failure recovery", async ({ bro
   await signupStudent(page, { name: "A11y Student", email, password });
   await expect(page.getByText(/have not submitted a project yet/i)).toBeVisible();
 
-  // Keyboard access on signup already landed; exercise login form via keyboard next.
-  await page.getByRole("button", { name: /^log out$/i }).click();
-  await page.goto("/login");
+  // Mobile shell keeps workspace return visible; account actions live under Menu.
+  await logout(page);
   await page.getByLabel(/^email$/i).focus();
   await page.keyboard.type(email);
   await page.keyboard.press("Tab");

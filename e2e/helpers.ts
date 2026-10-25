@@ -33,7 +33,17 @@ export async function login(
   await expect(page).toHaveURL(expectedPath);
 }
 
+export async function openAccountMenuIfNeeded(page: Page) {
+  const logoutButton = page.getByRole("button", { name: /^log out$/i });
+  if (await logoutButton.isVisible()) {
+    return;
+  }
+  await page.getByRole("button", { name: /^menu$/i }).click();
+  await expect(logoutButton).toBeVisible();
+}
+
 export async function logout(page: Page) {
+  await openAccountMenuIfNeeded(page);
   const logoutButton = page.getByRole("button", { name: /^log out$/i });
   await expect(logoutButton).toBeVisible();
   await logoutButton.click();

@@ -65,7 +65,7 @@ test("drafts, search URL state, checkpoints, and stats stability", async ({ brow
   const mentor = await mentorLogin(browser);
   const statsSection = mentor.page.locator("section[aria-label='Review statistics']");
   await expect(statsSection.getByText(/^Pending$/i)).toBeVisible();
-  const pendingBefore = await statsSection.locator(".font-serif").first().innerText();
+  const pendingBefore = await statsSection.locator("[data-stat-value='pending']").innerText();
 
   await mentor.page.getByLabel(/search projects/i).fill(projectName);
   await expect(mentor.page).toHaveURL(/q=/i, { timeout: 5000 });
@@ -73,7 +73,7 @@ test("drafts, search URL state, checkpoints, and stats stability", async ({ brow
     timeout: 5000,
   });
 
-  const pendingAfterSearch = await statsSection.locator(".font-serif").first().innerText();
+  const pendingAfterSearch = await statsSection.locator("[data-stat-value='pending']").innerText();
   expect(pendingAfterSearch).toBe(pendingBefore);
 
   const searchUrl = mentor.page.url();

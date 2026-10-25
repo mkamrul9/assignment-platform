@@ -10,13 +10,13 @@ export default function MentorWorkspacePage() {
     <RequireAuth role="MENTOR">
       {(user) => (
         <section className="min-w-0 max-w-6xl">
-          <p className="text-xs font-semibold tracking-[0.18em] text-primary uppercase">
-            Mentor workspace
-          </p>
-          <h1 className="mt-4 font-serif text-4xl tracking-tight">Hello, {user.name}</h1>
+          <p className="text-sm font-semibold tracking-wide text-primary">Mentor workspace</p>
+          <h1 className="mt-3 truncate text-3xl font-semibold tracking-tight sm:text-4xl">
+            Hello, {user.name}
+          </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
-            Review pending student projects, leave a clear decision with optional checkpoints, and
-            search the queue. Filters and search change the table only — the cards stay global.
+            Filter and search the queue, then approve or reject pending projects. Summary totals
+            stay global; filters only change the table.
           </p>
           <div className="mt-10">
             <Suspense

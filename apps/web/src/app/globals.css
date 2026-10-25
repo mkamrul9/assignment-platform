@@ -19,6 +19,10 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -26,31 +30,35 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: "Segoe UI", Arial, sans-serif;
-  --font-serif: Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-manrope), system-ui, "Segoe UI", Arial, sans-serif;
 }
 
 :root {
   color-scheme: light;
-  --background: #f6f5f0;
-  --foreground: #242a25;
-  --card: #fdfcf9;
-  --card-foreground: #242a25;
-  --popover: #fdfcf9;
-  --popover-foreground: #242a25;
-  --primary: #244e3e;
+  /* Off-white / light-slate surfaces, ink-blue actions, restrained amber accent */
+  --background: #f4f6f9;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #1e3a8a;
   --primary-foreground: #ffffff;
-  --secondary: #e8ece5;
-  --secondary-foreground: #244e3e;
-  --muted: #eeeee7;
-  --muted-foreground: #5f685f;
-  --accent: #e8ece5;
-  --accent-foreground: #244e3e;
-  --destructive: #b1362e;
-  --border: #d9ddd3;
-  --input: #d9ddd3;
-  --ring: #477b61;
-  --radius: 0.75rem;
+  --secondary: #e8eef7;
+  --secondary-foreground: #1e3a8a;
+  --muted: #eef1f6;
+  --muted-foreground: #475569;
+  --accent: #fef3c7;
+  --accent-foreground: #92400e;
+  --destructive: #b91c1c;
+  --success: #15803d;
+  --success-foreground: #052e16;
+  --warning: #b45309;
+  --warning-foreground: #78350f;
+  --border: #d5dde8;
+  --input: #d5dde8;
+  --ring: #2563eb;
+  --radius: 0.625rem;
 }
 
 @layer base {
@@ -63,7 +71,7 @@
   }
 
   ::selection {
-    background: #cddfc9;
-    color: #19392d;
+    background: #dbeafe;
+    color: #1e3a8a;
   }
 }
