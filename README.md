@@ -1,34 +1,51 @@
 # ReviewDock
 
-Students submit projects. Mentors review them with notes, optional checkpoints, and a paginated queue.
+A project submission and review dashboard. Students submit a repository, live URL, and description. Mentors review a paginated queue, filter by status, and approve or reject with notes.
+
+The browser talks only to Next.js. Next.js proxies `/api` to a private Express service. PostgreSQL is the source of truth.
 
 ```text
-Browser → Next.js (`/api` proxy) → private Express API → PostgreSQL
+Browser → Next.js → Express → PostgreSQL
 ```
 
-## Setup
+## Stack
 
-Node.js **24.11.1** (`.nvmrc`) or Node 22.18+; npm 10+. PostgreSQL 16 via Docker Compose.
+| Layer | Choice |
+| --- | --- |
+| Language | TypeScript |
+| Web | Next.js, Tailwind CSS, shadcn/ui |
+| API | Express |
+| Data | PostgreSQL, Prisma |
+| Auth | JWT in an HTTP-only cookie, role-based access (`STUDENT`, `MENTOR`) |
 
-PowerShell:
+## Features
 
-```powershell
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-if (!(Test-Path apps/api/.env)) { Copy-Item apps/api/.env.example apps/api/.env }
-if (!(Test-Path apps/web/.env.local)) { Copy-Item apps/web/.env.example apps/web/.env.local }
-```
+**Students**
+- Submit project name, repository URL, live URL, and description
+- Client and server validation (HTTPS URLs, length limits, no credentials in URLs)
+- Duplicate repositories are rejected (`409`) after URL canonicalization
+- Submission rate limit: 5 attempts per 10 minutes per student
 
-Bash:
+**Mentors**
+- Paginated review table (page size 10 / 20 / 50)
+- Approve or reject; rejection requires a note
+- Status filters (`Pending`, `Approved`, `Rejected`, `All`) applied in the API, not the client
+- Global totals: pending, approved, rejected, all
+
+**Auth**
+- Login for both roles
+- Student signup only
+- Mentor accounts are seeded (`npm run db:seed`), not self-registered
+
+## Run locally
+
+Requires Node.js 22.18+ (or 24.11 from `.nvmrc`), npm 10+, Docker.
 
 ```sh
-test -e .env || cp .env.example .env
-test -e apps/api/.env || cp apps/api/.env.example apps/api/.env
-test -e apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local
-```
+cp .env.example .env
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
 
-Copy the example env files above. JWT already has a demo default. Optional: put `MENTOR_*` credentials in `apps/api/.env` for `npm run db:seed`. If port 5432 is taken, set Compose `POSTGRES_PORT` and the host port in `DATABASE_URL` together.
-
-```sh
 npm ci --include=dev
 npm run db:up
 npm run db:migrate:deploy
@@ -36,65 +53,41 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). API default port is 4000.
+App: [http://localhost:3000](http://localhost:3000) · API: `http://127.0.0.1:4000`
 
-## Demo accounts (one-click sign-in)
+If port 5432 is already in use, set `POSTGRES_PORT` in `.env` and the same host port in `apps/api/.env` `DATABASE_URL`.
 
-These are **shared public** sandbox users. They appear on **Sign in** and **Sign up** when `DEMO_MODE=1`. Click **Sign in as Student A** (or Mentor): the form fills and you enter the workspace. You do not need your own email.
+## Accounts
 
-| Role      | Email                             | Password         |
-| --------- | --------------------------------- | ---------------- |
+After seed, sign in as the mentor from `apps/api/.env`:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Mentor | `mentor@example.com` | `change-me-now` |
+
+Create a student from **Sign up**.
+
+When `DEMO_MODE=1` (hosted demo, or a local `reviewdock_demo` database), these shared sandbox users appear on Sign in:
+
+| Role | Email | Password |
+| --- | --- | --- |
 | Student A | `student-a@demo.reviewdock.local` | `DemoStudentA1!` |
 | Student B | `student-b@demo.reviewdock.local` | `DemoStudentB1!` |
-| Mentor    | `mentor@demo.reviewdock.local`    | `DemoMentor1!`   |
+| Mentor | `mentor@demo.reviewdock.local` | `DemoMentor1!` |
 
-Local demo on the same ports as `npm run dev` (uses Compose Postgres, separate database):
+## Deploy
 
-```powershell
-Copy-Item apps/api/.env.demo.example apps/api/.env.demo
-# Set DATABASE_URL host port to your Compose POSTGRES_PORT (this machine: 5434).
-# Point apps/api/.env at reviewdock_demo and set DEMO_MODE=1, then:
-npm run demo:prepare
-npm run dev
-```
+One Render service runs Next.js and Express; Postgres is provisioned by the Blueprint. Environment variables are already in `render.yaml`.
 
-Anyone using a demo student shares that account’s projects. Mentor decisions are real inside the sandbox.
+[Deploy to Render](https://render.com/deploy?repo=https://github.com/mkamrul9/assignment-platform)
 
-## Commands
+The live URL is `https://reviewdock-xxxx.onrender.com`. Free instances sleep when idle; the first request can take about a minute. Free Render Postgres expires after 30 days.
 
-```sh
-npm run check
-npm run build
-npm run db:check
-npm run auth:check
-npm run submissions:check
-npm run reviews:check
-npm run demo:check
-npm run test:e2e
-```
+## Scripts
 
-`npm run demo:dev` is an alternate pair of ports (3001/4001) if you want demo isolated from `npm run dev`.
-
-## Share a live link (no env vars to type)
-
-The hosted demo already has secrets and `DEMO_MODE=1` in the code / `render.yaml`. You only connect GitHub. Render injects `DATABASE_URL` from Postgres.
-
-1. Push this repo to GitHub (this project already has `origin`).
-2. Open **[Deploy to Render](https://render.com/deploy?repo=https://github.com/mkamrul9/assignment-platform)** (or in the [Render dashboard](https://dashboard.render.com/): **New → Blueprint**, pick this repo).
-3. Sign in with GitHub and click **Apply**. Do not fill environment variables.
-4. Wait until the `reviewdock` web service is Live. The URL looks like `https://reviewdock-xxxx.onrender.com` — that is the link to share.
-
-The first visit after idle time can take about a minute (free instances sleep). Use the on-page **Sign in as Student A** / **Mentor** buttons.
-
-Free Render Postgres expires after 30 days. Upgrade that database if you need the demo to stay up.
-
-## Layout
-
-```text
-apps/api/     Express, Prisma, integration checks
-apps/web/     Next.js UI and `/api` proxy
-e2e/          Playwright
-compose.yaml  Local PostgreSQL
-render.yaml   One-click Render Blueprint (web + Postgres)
-Dockerfile    Hosted demo image (Next.js + Express together)
-```
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Web + API |
+| `npm run check` | Format, lint, types |
+| `npm run test:e2e` | Playwright against a production build |
+| `npm run db:seed` | Seed the mentor account |
