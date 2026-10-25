@@ -52,10 +52,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: ".nvmrc"
           cache: npm
@@ -85,10 +85,15 @@ jobs:
       - name: Review checks
         run: npm run reviews:check
 
+      - name: Demo sandbox checks
+        # Covers DEMO_MODE enabled (allowlisted disposable DB) and disabled (panel/API absent).
+        run: npm run demo:check
+
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
 
       - name: End-to-end tests
+        # Fails the job when any Playwright assertion fails. Uses E2E_* ports/DB above.
         run: npx playwright test
 
       - name: Upload Playwright report

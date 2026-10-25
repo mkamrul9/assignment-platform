@@ -1,6 +1,9 @@
+import path from "node:path";
+
 import { expect, test } from "@playwright/test";
 
 import { e2eState, login, logout, mentorLogin, uniqueEmail, signupStudent } from "./helpers";
+import { SCREENSHOT_DIR } from "./runtime";
 
 test("keyboard, dialog focus, mobile layout, and failure recovery", async ({ browser, page }) => {
   const state = e2eState();
@@ -10,6 +13,10 @@ test("keyboard, dialog focus, mobile layout, and failure recovery", async ({ bro
   await page.setViewportSize({ width: 390, height: 844 });
   await signupStudent(page, { name: "A11y Student", email, password });
   await expect(page.getByText(/have not submitted a project yet/i)).toBeVisible();
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, "student-mobile.png"),
+    fullPage: true,
+  });
 
   // Mobile shell keeps workspace return visible; account actions live under Menu.
   await logout(page);

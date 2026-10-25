@@ -25,6 +25,23 @@ test("student and mentor review lifecycle through the proxied UI", async ({ brow
   const liveUrl = `https://lifecycle-${stamp}.example.com`;
   const description = "A complete lifecycle description for browser verification coverage.";
 
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", {
+      name: /ReviewDock helps students submit projects/i,
+    }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, "public-home.png"),
+    fullPage: true,
+  });
+  await page.goto("/signup");
+  await expect(page.getByRole("heading", { name: /create a student account/i })).toBeVisible();
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, "auth-signup.png"),
+    fullPage: true,
+  });
+
   // Empty list after signup
   await signupStudent(page, {
     name: "Lifecycle Student",

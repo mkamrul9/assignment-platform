@@ -1,7 +1,10 @@
+import path from "node:path";
+
 import { expect, test } from "@playwright/test";
 
 import { DEMO_ACCOUNTS } from "./demo-accounts";
 import { logout, signupStudent, uniqueEmail } from "./helpers";
+import { SCREENSHOT_DIR } from "./runtime";
 
 test.describe("demo auth panel", () => {
   test("login panel prefills and opens the correct workspace", async ({ page }) => {
@@ -9,6 +12,10 @@ test.describe("demo auth panel", () => {
     await expect(page.getByRole("heading", { name: /try a shared demo account/i })).toBeVisible();
     await expect(page.getByText(DEMO_ACCOUNTS.studentA.email)).toBeVisible();
     await expect(page.getByText(DEMO_ACCOUNTS.mentor.email)).toBeVisible();
+    await page.screenshot({
+      path: path.join(SCREENSHOT_DIR, "demo-account-selection.png"),
+      fullPage: true,
+    });
 
     await page.getByRole("button", { name: /use student a/i }).click();
     await expect(page.getByLabel(/^email$/i)).toHaveValue(DEMO_ACCOUNTS.studentA.email);
