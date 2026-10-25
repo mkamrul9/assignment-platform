@@ -80,7 +80,7 @@ export function ReviewDialog({
     <dialog
       ref={dialogRef}
       aria-labelledby={dialogTitleId}
-      className="w-[min(100%,36rem)] max-h-[min(90vh,40rem)] overflow-y-auto rounded-xl border bg-card p-0 text-foreground shadow-lg backdrop:bg-foreground/40"
+      className="m-auto w-[min(100%,36rem)] max-h-[min(90vh,40rem)] overflow-y-auto rounded-xl border bg-card p-0 text-foreground shadow-lg backdrop:bg-foreground/40"
       onClose={handleDialogClose}
     >
       {listRow || detail ? (

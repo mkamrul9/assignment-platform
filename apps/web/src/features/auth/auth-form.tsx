@@ -65,6 +65,9 @@ export function AuthForm({
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) {
+      return;
+    }
     setErrors({});
     setSubmitting(true);
 
@@ -110,7 +113,7 @@ export function AuthForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5" noValidate>
+    <form method="post" onSubmit={onSubmit} className="space-y-5" noValidate>
       {mode === "signup" ? (
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>

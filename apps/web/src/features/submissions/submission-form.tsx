@@ -195,7 +195,7 @@ export function SubmissionForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5" noValidate>
+    <form method="post" onSubmit={onSubmit} className="space-y-5" noValidate>
       <div
         className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-secondary/40 px-3 py-2 text-sm"
         aria-live="polite"

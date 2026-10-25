@@ -11,11 +11,14 @@ export async function signupStudent(
   input: { name: string; email: string; password: string },
 ) {
   await page.goto("/signup");
+  const submit = page.getByRole("button", { name: /create student account/i });
+  await expect(submit).toBeEnabled();
   await page.getByLabel(/^name$/i).fill(input.name);
   await page.getByLabel(/^email$/i).fill(input.email);
   await page.getByLabel(/^password$/i).fill(input.password);
-  await page.getByRole("button", { name: /create student account/i }).click();
+  await submit.click();
   await expect(page).toHaveURL(/\/student/);
+  expect(page.url()).not.toMatch(/password=/i);
 }
 
 export async function login(
@@ -27,10 +30,13 @@ export async function login(
     await page.goto("/login");
   }
   await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+  const submit = page.getByRole("button", { name: /^sign in$/i });
+  await expect(submit).toBeEnabled();
   await page.getByLabel(/^email$/i).fill(input.email);
   await page.getByLabel(/^password$/i).fill(input.password);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await submit.click();
   await expect(page).toHaveURL(expectedPath);
+  expect(page.url()).not.toMatch(/password=/i);
 }
 
 export async function openAccountMenuIfNeeded(page: Page) {
