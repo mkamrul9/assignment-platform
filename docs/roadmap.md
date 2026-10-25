@@ -167,9 +167,20 @@ Commit: `feat: add bounded student project browsing and details`
 
 Commit: `feat: refine mentor review details and conflict recovery`
 
+### U6: Measured performance and regression verification
+
+- [x] Disposable DB performance harness (`perf:check`) on 800 synthetic submissions; refuses non-`reviewdock_u6_perf*` / development targets; writes [`perf-raw.json`](upgrades/perf-raw.json).
+- [x] Measured plans: owner/PENDING paths use existing indexes; mentor ALL/newest justified `submissions_created_idx`; contains-search remains sequential (no false B-tree claim).
+- [x] Owner stats reduced to one `groupBy`; lists bounded; warm API timings/payload sizes recorded.
+- [x] Frontend production chunks/fonts inspected; no secrets/Prisma in client bundles; store dedupe/stale guards retained.
+- [x] Full sequential suites: `check`, `build`, `db:check`, `auth:check`, `submissions:check`, `reviews:check`, `demo:check`, `perf:check`, `test:e2e` (20 Chromium).
+- [x] Homepage + direct/proxied health; health remains 200 with unreachable PostgreSQL.
+- [x] Evidence: [`verification.md`](upgrades/verification.md).
+
+Commit: `test: measure queue performance and record U6 verification`
+
 ### Remaining upgrade phases
 
-- [ ] U6: Measure performance and run complete correctness/accessibility regression verification.
 - [ ] U7: Finish final documentation and authorized, evidenced delivery.
 
 ## Working agreement
