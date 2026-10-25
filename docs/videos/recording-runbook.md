@@ -4,7 +4,7 @@ Part 2 lesson topics, durations, language, format, and submission method are **n
 
 Distinguish **prepared scripts** from **videos actually recorded, reviewed, and delivered**. Nothing in this folder is a finished recording.
 
-## Startup (local demo)
+## Startup (normal local app)
 
 1. `npm ci --include=dev`
 2. `npm run db:up`
@@ -13,7 +13,16 @@ Distinguish **prepared scripts** from **videos actually recorded, reviewed, and 
 5. `npm run db:seed` (uses `MENTOR_*` from `apps/api/.env` — do not show real secrets on screen).
 6. `npm run dev` — web on `:3000`, API on `:4000`.
 
-Optional clean demo database: create a disposable DB or use a throwaway compose project; do not wipe a shared development database if you need to keep local work.
+## Optional isolated demo sandbox (public synthetic accounts)
+
+Use only when the lesson should show the shared demo panel. Never point demo env at the development database name `reviewdock`.
+
+1. Copy `apps/api/.env.demo.example` → `apps/api/.env.demo` and `apps/web/.env.demo.example` → `apps/web/.env.demo.local`.
+2. Align Postgres host ports with Compose.
+3. `npm run demo:prepare` then `npm run demo:dev` (defaults `:3001` / `:4001`).
+4. On camera, prefer the on-screen demo panel credentials; they are intentionally public synthetic identities.
+
+Do not wipe a shared development database to prepare a recording.
 
 ## Synthetic demo data
 
@@ -65,11 +74,18 @@ Project titles such as “Neighborhood Library Finder” or “Aurora Feedback B
 - Final review of captions/audio against the brief.
 - Upload or LMS submission steps defined by the assessment.
 
+## Missing inputs (do not invent)
+
+- Detailed Part 2 lesson topics and learning objectives
+- Required duration, language, format, and captions policy
+- Submission channel / LMS upload steps
+- Assessment deadline (if recordings must land before public repo visibility)
+
 ## Status
 
 | Artifact                      | Status                  |
 | ----------------------------- | ----------------------- |
-| Technical runbook             | Prepared                |
+| Technical runbook             | Prepared / updated U7   |
 | Lesson outlines / narration   | Blocked on Part 2 brief |
 | Recorded videos               | Not recorded            |
 | Reviewed and delivered videos | Not delivered           |

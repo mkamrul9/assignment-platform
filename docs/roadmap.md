@@ -179,9 +179,24 @@ Commit: `feat: refine mentor review details and conflict recovery`
 
 Commits: `perf: index mentor ALL ordering and reduce owner stats queries`, `docs: record U6 performance and regression verification`
 
+### U7: Documentation, reproducibility, and delivery handoff
+
+- [x] Refresh README, architecture, decisions, operations, CONTRIBUTING, and recording runbook to match final behavior; distinguish requirements vs optional enhancements.
+- [x] Fresh-install verification on an isolated copy: `npm ci --include=dev`, migrations, mentor seed, production build/start, student→mentor→student lifecycle; separate demo prepare + idempotent re-seed; disposable DBs cleaned; development data preserved ([delivery](upgrades/delivery.md)).
+- [x] Final sequential suites: `check`, `build`, `db:check`, `auth:check`, `submissions:check`, `reviews:check`, `demo:check`, `test:e2e` (20 Chromium); homepage + health smokes.
+- [x] Final synthetic screenshots including public home, auth, demo selection, student mobile, projects/details, mentor queue/dialog.
+- [x] CI workflow: Node from `.nvmrc`, `npm ci --include=dev`, Postgres service, integration + `demo:check`, Playwright Chromium/`--with-deps`, artifacts; actions `checkout`/`setup-node` @v7.
+- [ ] Push to the intended GitHub repository and verify the intended commit is reachable.
+- [ ] Observe a passing GitHub Actions run on that remote.
+- [ ] Make the repository public after the assessment deadline and verify signed-out access.
+- [ ] Authorized hosted deployment (if required) with HTTPS/proxy verification.
+- [ ] Part 2 video lessons (instructions still unavailable).
+
+Commits: `ci: cover demo checks and pin Actions v7`, `docs: finalize U7 delivery documentation and screenshots`
+
 ### Remaining upgrade phases
 
-- [ ] U7: Finish final documentation and authorized, evidenced delivery.
+_None. External delivery and video items stay open above until their inputs and observations exist._
 
 ## Working agreement
 

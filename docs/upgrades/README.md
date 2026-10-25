@@ -26,6 +26,6 @@ U3 adds deliberately public **synthetic** identities in an opt-in sandbox (`DEMO
 
 The quoted Part 1 features already have implementations and previous passing checks. The upgrade audit must verify this rather than manufacture a missing feature. The intentionally ambiguous brief calls for engineering judgment around ownership, URL uniqueness, rate limits, role boundaries, rejection notes, race conditions, and error states. It does not imply secret requirements for chat, notifications, AI grading, uploads, editing decisions, or an additional admin role.
 
-## Delivery is still open
+## Delivery status after U7
 
-No GitHub remote or assessment deadline was configured at preparation time. A public demo UI does not make a localhost app accessible on the internet. Actual public access requires an authorized deployment target, and assessment delivery requires the intended reachable GitHub repository and post-deadline visibility checks. Keep these items and the two lessons open until the required inputs and observations exist.
+Local documentation, fresh-install evidence, suites, screenshots, and CI **configuration** are recorded in [delivery.md](delivery.md). No GitHub remote or assessment deadline was configured in this checkout. A public demo UI does not make a localhost app accessible on the internet. Actual public access requires an authorized deployment target; assessment delivery requires the intended reachable GitHub repository, an observed Actions run, and post-deadline visibility checks. Keep those items and the two lessons open until the required inputs and observations exist.

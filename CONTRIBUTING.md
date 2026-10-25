@@ -39,10 +39,11 @@ npm run db:check
 npm run auth:check
 npm run submissions:check
 npm run reviews:check
+npm run demo:check
 npm run test:e2e
 ```
 
-`check` covers application code, integration checks, Prisma configuration/seed, and Playwright tooling. Database suites need PostgreSQL and a local test user allowed to create/drop disposable databases. E2E uses separate processes and synthetic accounts; see the README for ports and safety restrictions.
+`check` covers application code, integration checks, Prisma configuration/seed, and Playwright tooling. Database suites need PostgreSQL and a local test user allowed to create/drop disposable databases. `demo:check` uses an allowlisted disposable demo database and also asserts disabled-demo behavior. E2E uses separate processes and synthetic accounts; see the README for ports and safety restrictions. Optional `perf:check` writes measured evidence under `docs/upgrades/` and must not target the development database.
 
 Add regression coverage for meaningful defects and new behavior. Do not mock PostgreSQL to claim that database constraints work. Browser interception is appropriate for client failure states. Update API examples and docs whenever contracts or setup change.
 

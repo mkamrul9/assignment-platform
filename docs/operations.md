@@ -13,7 +13,7 @@ Express enforces authentication, current database roles, trusted Origins, valida
 ## Release order
 
 1. Install with `npm ci --include=dev`. Compilation and Prisma migrations use build-time development dependencies.
-2. Run `npm run check`, all four integration checks, and browser tests in an isolated test environment. Build with `npm run build`.
+2. Run `npm run check`, integration checks (`db`/`auth`/`submissions`/`reviews`/`demo`), and browser tests in an isolated test environment. Build with `npm run build`.
 3. Take a database backup and verify the restore procedure in a separate database.
 4. Apply **committed** migrations to the target database: `npm run db:migrate:deploy`. Review forward migrations before a release; schema rollbacks are not automatic.
 5. For initial setup, supply `MENTOR_NAME`, `MENTOR_EMAIL`, and `MENTOR_PASSWORD` as secrets and run `npm run db:seed`. Existing mentors are left unchanged. Do not automate password rotation through the seed.
@@ -77,6 +77,6 @@ If you expose a visitor demo, use a **separate** deployment with its own `review
 
 ## What is and is not established
 
-The local checks establish the implemented application lifecycle, permission boundaries, database constraints/transactions, Chromium interactions, and production compilation. A real release additionally needs an observed green GitHub Actions run, an authorized hosting target, HTTPS/proxy verification, tested backups, monitoring, and capacity/load testing for the expected traffic. Firefox/WebKit and screen-reader testing are not part of the current browser suite.
+The local checks establish the implemented application lifecycle, permission boundaries, database constraints/transactions, Chromium interactions, demo enabled/disabled behavior, and production compilation. Measured queue plans/timings are recorded under `docs/upgrades/verification.md`. A real release additionally needs an **observed** green GitHub Actions run, an authorized hosting target, HTTPS/proxy verification, tested backups with retention and restore drills, monitoring, and capacity/load testing for the expected traffic. Firefox/WebKit and screen-reader testing are not part of the current browser suite. No paid infrastructure is provisioned by this repository.
 
-Rate limits are in memory, per process, and reset on restart. Multiple API instances require a shared limiter store before relying on global limits. Logout clears the browser cookie; a copied JWT remains valid until its 30-minute expiry. There is no immediate revocation or account-recovery flow. Drafts are device-local, not server backups. These are explicit scope limitations, not production guarantees.
+Rate limits are in memory, per process, and reset on restart. Multiple API instances require a shared limiter store before relying on global limits. Logout clears the browser cookie; a copied JWT remains valid until its 30-minute expiry. There is no immediate revocation or account-recovery flow. Drafts are device-local, not server backups. Public demo accounts require a separate `reviewdock_demo*` database and must never share production user data. These are explicit scope limitations, not production guarantees.

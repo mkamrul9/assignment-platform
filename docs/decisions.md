@@ -54,4 +54,4 @@ An optional demo mode (`DEMO_MODE=1`) serves intentionally public synthetic acco
 
 ## Delivery
 
-Keep the repository private initially if needed, then make it public after the submission deadline as the assessment requires. Do not invent a deadline: none was supplied. GitHub hosting, production deployment, and the two video lessons belong to later phases.
+Keep the repository private initially if needed, then make it public **after** the assessment deadline as the brief requires. An unreachable repository can disqualify the submission. Do not invent a deadline, GitHub URL, or visibility decision: none were supplied in this checkout. Local verification and a configured Actions workflow are not substitutes for an observed remote CI run, signed-out reachability, or an authorized deployment. Part 2 video topics, durations, language, format, and submission method remain open; only a technical [recording runbook](videos/recording-runbook.md) is prepared.

@@ -6,7 +6,7 @@ Next.js owns presentation, navigation, and form interaction. Express owns valida
 
 The browser calls `/api/*` on the web origin. Next.js forwards those requests to Express through `apps/web/src/app/api/[...path]/route.ts` using server-only `API_INTERNAL_URL`. The proxy preserves an incoming `Origin` exactly when present (it never invents one), forwards `Cookie`, and returns multiple `Set-Cookie` values so Express trusted-origin checks and session cookies stay aligned with the public web origin. Caller-supplied `X-Forwarded-For` / `X-Real-IP` / `Forwarded` headers are stripped. Accurate per-IP login/signup limits require a trusted ingress that replaces (not appends) the client address and `TRUST_INGRESS_CLIENT_IP=1` on the web app; otherwise Express rates by the Next→Express peer (conservative shared bucket). Keep Express privately reachable.
 
-Implemented so far: health, persistence, authentication, student submissions, mentor reviews, Playwright e2e coverage, and CI configuration.
+Implemented: health, persistence, authentication, student submissions (bounded mine + detail), mentor reviews (compact queue + on-demand detail), optional demo sandbox, Playwright e2e coverage, local performance harness, and CI configuration.
 
 ## Structure
 
@@ -34,7 +34,7 @@ apps/
         layout/                   AppShell, navbar, footer (shared chrome)
       features/
         auth/                     Session provider, forms, guards
-        submissions/              Submit form and project list
+        submissions/              Form, drafts, project list/detail
         reviews/                  Queue composition, store, query helpers, and dialog
       lib/
         api.ts                    Relative /api fetch helper
@@ -44,9 +44,11 @@ apps/
       schema.prisma               Users, submissions, reviews
       migrations/
       seed.ts                     Mentor account from environment
+      demo-*.ts                   Guarded demo DB prepare/seed/reset
     prisma.config.ts              Prisma CLI datasource and seed config
     src/
       config/env.ts
+      demo/                       Allowlisted demo fixtures and guards
       lib/prisma.ts               Shared Prisma client (driver adapter)
       lib/canonical-repository-url.ts
       middleware/
@@ -58,6 +60,7 @@ apps/
       modules/
         health/
         auth/
+        demo/                     GET /api/demo/accounts when DEMO_MODE=1
         submissions/
         reviews/                  Queue, stats, and atomic decisions
       app.ts
@@ -67,11 +70,15 @@ apps/
       auth.check.ts
       submissions.check.ts
       reviews.check.ts
+      demo.check.ts
+      perf.check.ts
 e2e/                              Playwright harness and specs
 .github/workflows/ci.yml
 compose.yaml                      Local PostgreSQL with persistent volume
 docs/
   screenshots/                    Synthetic UI captures from e2e
+  upgrades/                       Baseline, verification, upgrade prompts
+  videos/                         Technical recording runbook (Part 2 open)
 ```
 
 PostgreSQL runs through Docker Compose. Prisma ORM 7 generates an ESM client into `apps/api/src/generated/prisma` (gitignored) and connects with `@prisma/adapter-pg`. Database access stays inside the Express workspace. Deleting a user cascades to their submissions; deleting a submission cascades to its review; deleting a mentor who still has reviews is restricted.
@@ -119,9 +126,9 @@ The paginated response contains rows and pagination metadata. Statistics cover t
 
 ## Verification strategy
 
-The foundation needs formatting, lint, type checks, production builds, and HTTP smoke checks. Phase 2 adds `npm run db:check`. Phase 3 adds `npm run auth:check`. Phase 4 adds `npm run submissions:check`. Phase 5 adds `npm run reviews:check`. Phase 6 adds Playwright (`npm run test:e2e`) against a disposable database with real Next.js + Express processes, plus `.github/workflows/ci.yml`.
+Local verification runs sequentially: `check`, `build`, `db:check`, `auth:check`, `submissions:check`, `reviews:check`, `demo:check`, and Playwright (`test:e2e`) against disposable databases with real Next.js + Express processes. CI mirrors that set (see `.github/workflows/ci.yml`). Optional `perf:check` records plans/timings on a larger synthetic corpus ([verification](upgrades/verification.md)).
 
-Integration tests use isolated PostgreSQL databases and clean up after failures. Browser checks cover signup/login, submission validation, mentor filters/pagination/decisions, keyboard dialog focus, mobile viewports, intercepted failure/retry paths, and session-expiry navigation. Screenshots live under `docs/screenshots/`.
+Integration tests clean up after failures. Browser checks cover public/auth navigation, demo panel (e2e enables DEMO_MODE), drafts, student browse/details, mentor filters/search/pagination/decisions/recovery, keyboard dialog focus, mobile viewports, intercepted failure/retry paths, and session-expiry navigation. Screenshots live under `docs/screenshots/`.
 
 The foundation uses ESLint 9 because the React, import, and accessibility plugins bundled by Next.js 16.4.2 declare support through that major version. npm currently emits a deprecation notice for ESLint 9. Move to ESLint 10 when those plugins support it; do not bypass their peer requirements.
 
