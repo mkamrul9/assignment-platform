@@ -174,6 +174,10 @@ async function runChecks() {
   process.env.WEB_ORIGINS = TRUSTED_ORIGIN;
   process.env.TRUST_PROXY = "0";
   process.env.SESSION_COOKIE_NAME = COOKIE_NAME;
+  // Core suite issues many signup/login calls; keep production defaults for the
+  // dedicated rate-limit app created after these checks.
+  process.env.SIGNUP_RATE_LIMIT_MAX = "100";
+  process.env.LOGIN_RATE_LIMIT_MAX = "100";
 
   const { createApp } = await import("../src/app.js");
   const { prisma } = await import("../src/lib/prisma.js");
@@ -329,6 +333,47 @@ async function runChecks() {
     });
     assert(malformed.status === 400, "malformed login must be 400");
 
+    // bcrypt 72-byte limit: signup rejects over-long passwords; login must not
+    // silently truncate a longer candidate into a matching prefix.
+    const password72 = "p".repeat(72);
+    const overlongSignup = await requestJson(baseUrl, "POST", "/api/auth/signup", {
+      origin: TRUSTED_ORIGIN,
+      body: {
+        name: "Overlong",
+        email: "overlong-signup@example.com",
+        password: `${password72}x`,
+      },
+    });
+    assert(overlongSignup.status === 400, "signup over 72 UTF-8 bytes must be 400");
+
+    const exact72Signup = await requestJson(baseUrl, "POST", "/api/auth/signup", {
+      origin: TRUSTED_ORIGIN,
+      body: {
+        name: "Exact Bytes",
+        email: "exact72@example.com",
+        password: password72,
+      },
+    });
+    assert(
+      exact72Signup.status === 201,
+      `72-byte signup expected 201, got ${exact72Signup.status}`,
+    );
+
+    const exact72Login = await requestJson(baseUrl, "POST", "/api/auth/login", {
+      origin: TRUSTED_ORIGIN,
+      body: { email: "exact72@example.com", password: password72 },
+    });
+    assert(exact72Login.status === 200, "exact 72-byte password must login");
+
+    const truncatedLogin = await requestJson(baseUrl, "POST", "/api/auth/login", {
+      origin: TRUSTED_ORIGIN,
+      body: { email: "exact72@example.com", password: `${password72}EXTRA` },
+    });
+    assert(
+      truncatedLogin.status === 400,
+      `login must reject over-long password before bcrypt truncation, got ${truncatedLogin.status}`,
+    );
+
     // Missing auth
     const missing = await requestJson(baseUrl, "GET", "/api/auth/me");
     assert(missing.status === 401, "missing session must be 401");
@@ -441,6 +486,26 @@ async function runChecks() {
     });
     assert(mentorAreaAsMentor.status === 200, "mentor can access mentor area");
 
+    // Authorization uses the current database role, not a role claim in the JWT.
+    await prisma.user.update({
+      where: { id: stored.id },
+      data: { role: Role.MENTOR },
+    });
+    assert(
+      (await requestJson(baseUrl, "GET", "/api/test/mentor-area", { cookie: studentCookie }))
+        .status === 200,
+      "promoted student session must see current MENTOR role",
+    );
+    await prisma.user.update({
+      where: { id: stored.id },
+      data: { role: Role.STUDENT },
+    });
+    assert(
+      (await requestJson(baseUrl, "GET", "/api/test/mentor-area", { cookie: studentCookie }))
+        .status === 403,
+      "demoted session must lose mentor access",
+    );
+
     // Origin protection
     for (const origin of [undefined, "null", "not-a-url", "http://evil.example"] as const) {
       const blocked = await requestJson(baseUrl, "POST", "/api/auth/logout", {
@@ -471,7 +536,9 @@ async function runChecks() {
     });
   }
 
-  // Fresh router instances so earlier requests do not consume the limiter budget.
+  // Fresh router instances with default limits so earlier requests do not consume the budget.
+  delete process.env.SIGNUP_RATE_LIMIT_MAX;
+  delete process.env.LOGIN_RATE_LIMIT_MAX;
   const rate = await listen(createApp());
   try {
     for (let i = 0; i < 10; i += 1) {

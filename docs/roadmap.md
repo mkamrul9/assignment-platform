@@ -112,9 +112,21 @@ The supplied brief mentions two videos but does not include the lesson requireme
 
 ## Requested product upgrades (planned)
 
-Copy-ready execution prompts and shared constraints live in [the upgrade guide](upgrades/README.md). These phases are planned, not implemented or verified by preparing the prompts. Preserve the completed history above.
+Copy-ready execution prompts and shared constraints live in [the upgrade guide](upgrades/README.md). Preserve the completed history above. Mark phases complete only with observed evidence.
 
-- [ ] U1: Audit the supplied assessment requirements and establish a current baseline.
+### U1: Requirement audit and baseline
+
+- [x] Map Part 1 stack/feature requirements to implementation and test evidence ([baseline](upgrades/baseline.md)).
+- [x] Keep GitHub reachability, observed Actions CI, deployment host verification, and Part 2 videos as separate open items.
+- [x] Audit auth, ownership, duplicates, limits, cookies, Origin, filters, reviews, and session/error recovery against live assertions.
+- [x] Fix login bcrypt 72-byte truncation gap; harden `hashPassword` / `verifyPassword`; add auth regressions (including current DB role).
+- [x] Record performance risks without claiming unmeasured wins; defer browse/detail to U4/U5 and optimization to U6.
+- [x] Verify sequentially: `check`, `build`, `db:check`, `auth:check`, `submissions:check`, `reviews:check`, `test:e2e` (all passed locally).
+
+Commit: `fix: reject over-long passwords on login`
+
+### Remaining upgrade phases
+
 - [ ] U2: Apply the blue/neutral visual system, Manrope, shared navbar/footer, and responsive shell.
 - [ ] U3: Add a guarded public-demo sandbox and synthetic auth-screen accounts.
 - [ ] U4: Add bounded student search/filter/pagination and authorized project details.

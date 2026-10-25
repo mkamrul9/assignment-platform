@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { assertPasswordPolicy } from "../../lib/password.js";
+import {
+  assertPasswordPolicy,
+  PASSWORD_MAX_BYTES,
+  passwordByteLength,
+} from "../../lib/password.js";
 import { normalizeEmail } from "../../lib/email.js";
 
 export const signupSchema = z
@@ -33,7 +37,19 @@ export const loginSchema = z
       .min(1, "Email is required.")
       .email("Enter a valid email address.")
       .transform(normalizeEmail),
-    password: z.string().min(1, "Password is required."),
+    // Reject over-long passwords before bcrypt so a 73+ byte string cannot
+    // authenticate as the matching 72-byte prefix of a stored password.
+    password: z
+      .string()
+      .min(1, "Password is required.")
+      .superRefine((value, ctx) => {
+        if (passwordByteLength(value) > PASSWORD_MAX_BYTES) {
+          ctx.addIssue({
+            code: "custom",
+            message: `Password must be at most ${PASSWORD_MAX_BYTES} bytes (bcrypt limit).`,
+          });
+        }
+      }),
   })
   .strict();
 

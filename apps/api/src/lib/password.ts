@@ -20,9 +20,21 @@ export function assertPasswordPolicy(password: string): string | null {
 }
 
 export async function hashPassword(password: string): Promise<string> {
+  const policyError = assertPasswordPolicy(password);
+  if (policyError) {
+    throw new Error(policyError);
+  }
   return bcrypt.hash(password, BCRYPT_COST);
 }
 
+/**
+ * Compare a candidate password to a stored hash without bcrypt truncation.
+ * Inputs longer than 72 UTF-8 bytes are treated as non-matching so a longer
+ * string cannot silently authenticate as its 72-byte prefix.
+ */
 export async function verifyPassword(password: string, passwordHash: string): Promise<boolean> {
+  if (passwordByteLength(password) > PASSWORD_MAX_BYTES) {
+    return false;
+  }
   return bcrypt.compare(password, passwordHash);
 }
