@@ -177,7 +177,7 @@ Commit: `feat: refine mentor review details and conflict recovery`
 - [x] Homepage + direct/proxied health; health remains 200 with unreachable PostgreSQL.
 - [x] Evidence: [`verification.md`](upgrades/verification.md).
 
-Commit: `test: measure queue performance and record U6 verification`
+Commits: `perf: index mentor ALL ordering and reduce owner stats queries`, `docs: record U6 performance and regression verification`
 
 ### Remaining upgrade phases
 
