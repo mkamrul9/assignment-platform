@@ -26,10 +26,15 @@ export function requireTrustedOrigin(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  if (origin !== originHeader || !trustedOrigins.has(origin)) {
+  if (origin !== originHeader) {
     sendError(res, 403, "FORBIDDEN_ORIGIN", "Origin is not trusted.");
     return;
   }
 
-  next();
+  if (trustedOrigins.has("*") || trustedOrigins.has(origin)) {
+    next();
+    return;
+  }
+
+  sendError(res, 403, "FORBIDDEN_ORIGIN", "Origin is not trusted.");
 }

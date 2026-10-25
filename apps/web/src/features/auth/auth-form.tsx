@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,12 +18,12 @@ type Mode = "login" | "signup";
 
 type FieldErrors = Partial<Record<"name" | "email" | "password" | "form", string>>;
 
-export type AuthFormCredentials = { email: string; password: string };
+export type AuthFormCredentials = { email: string; password: string; autoSubmit?: boolean };
 
 function initialLoginCredentials(prefill?: AuthFormCredentials | null): AuthFormCredentials {
   const pending = takePendingDemoFill();
   if (pending) {
-    return pending;
+    return { ...pending, autoSubmit: true };
   }
   if (prefill) {
     return prefill;
@@ -54,6 +54,7 @@ export function AuthForm({
   );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const autoSubmitStarted = useRef<string | null>(null);
 
   if (mode === "login" && prefill && prefill !== appliedPrefill) {
     setAppliedPrefill(prefill);
@@ -63,8 +64,7 @@ export function AuthForm({
 
   const nextPath = useMemo(() => safeReturnPath(searchParams.get("next")), [searchParams]);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function authenticate(nextName: string, nextEmail: string, nextPassword: string) {
     if (submitting) {
       return;
     }
@@ -75,8 +75,8 @@ export function AuthForm({
       const path = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       const body =
         mode === "signup"
-          ? JSON.stringify({ name, email, password })
-          : JSON.stringify({ email, password });
+          ? JSON.stringify({ name: nextName, email: nextEmail, password: nextPassword })
+          : JSON.stringify({ email: nextEmail, password: nextPassword });
 
       const data = await apiFetch<{ user: AuthUser }>(path, {
         method: "POST",
@@ -107,9 +107,32 @@ export function AuthForm({
       } else {
         setErrors({ form: "Something went wrong. Please try again." });
       }
+      autoSubmitStarted.current = null;
     } finally {
       setSubmitting(false);
     }
+  }
+
+  useEffect(() => {
+    if (mode !== "login" || submitting) {
+      return;
+    }
+    const demoFill = prefill?.autoSubmit ? prefill : loginSeed.autoSubmit ? loginSeed : null;
+    if (!demoFill?.email || !demoFill.password) {
+      return;
+    }
+    if (autoSubmitStarted.current === demoFill.email) {
+      return;
+    }
+    autoSubmitStarted.current = demoFill.email;
+    void authenticate("", demoFill.email, demoFill.password);
+    // Demo one-click sign-in only. Manual typing never sets autoSubmit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when demo credentials are applied
+  }, [mode, prefill, loginSeed]);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await authenticate(name, email, password);
   }
 
   return (

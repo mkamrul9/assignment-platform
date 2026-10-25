@@ -1,0 +1,35 @@
+# One-click demo: Postgres + a single web box that runs Next.js and Express.
+# You do not type environment variables. Apply this Blueprint from GitHub.
+services:
+  - type: web
+    name: reviewdock
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEMO_MODE
+        value: "1"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: WEB_ORIGINS
+        value: "*"
+      - key: JWT_ISSUER
+        value: reviewdock
+      - key: JWT_AUDIENCE
+        value: reviewdock-web
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reviewdock-demo
+          property: connectionString
+
+databases:
+  - name: reviewdock-demo
+    plan: free
+    databaseName: reviewdock_demo
+    postgresMajorVersion: "16"
+    ipAllowList: []

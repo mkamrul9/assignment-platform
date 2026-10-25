@@ -9,7 +9,7 @@ export function LoginPageClient() {
   const [prefill, setPrefill] = useState<AuthFormCredentials | null>(null);
 
   function onSelectAccount(account: DemoAccountOption) {
-    setPrefill({ email: account.email, password: account.password });
+    setPrefill({ email: account.email, password: account.password, autoSubmit: true });
   }
 
   return (

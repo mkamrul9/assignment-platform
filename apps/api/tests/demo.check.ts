@@ -14,6 +14,7 @@ import {
   assertAllowlistedDemoDatabase,
   assertDemoSeedTarget,
   isAllowlistedDemoDatabaseName,
+  isAllowedDemoSeedDatabase,
 } from "../src/demo/database-guard.js";
 import { DEMO_SUBMISSION_COUNT } from "../src/demo/fixtures.js";
 import { seedDemoDatabase } from "../src/demo/seed.js";
@@ -163,6 +164,14 @@ async function runChecks() {
   );
   assert(!isAllowlistedDemoDatabaseName("reviewdock"), "development name refused");
   assert(!isAllowlistedDemoDatabaseName("reviewdock_e2e"), "e2e name refused");
+  assert(
+    isAllowedDemoSeedDatabase("postgresql://u:p@dpg-abc.render.com:5432/random_platform_name"),
+    "hosted platform database names are allowed",
+  );
+  assert(
+    !isAllowedDemoSeedDatabase(replaceDatabaseName(DEV_DATABASE_URL, "reviewdock")),
+    "local development database remains refused",
+  );
 
   let threw = false;
   try {

@@ -116,7 +116,7 @@ export function DemoAccountsPanel({ mode, onSelectAccount }: DemoAccountsPanelPr
               className="shrink-0"
               onClick={() => choose(account)}
             >
-              {mode === "signup" ? "Use on sign-in" : `Use ${account.label}`}
+              {`Sign in as ${account.label}`}
             </Button>
           </li>
         ))}

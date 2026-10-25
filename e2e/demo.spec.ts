@@ -17,10 +17,7 @@ test.describe("demo auth panel", () => {
       fullPage: true,
     });
 
-    await page.getByRole("button", { name: /use student a/i }).click();
-    await expect(page.getByLabel(/^email$/i)).toHaveValue(DEMO_ACCOUNTS.studentA.email);
-    await expect(page.getByLabel(/^password$/i)).toHaveValue(DEMO_ACCOUNTS.studentA.password);
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: /sign in as student a/i }).click();
     await expect(page).toHaveURL(/\/student/);
     await expect(page.getByRole("heading", { name: /hello, demo student a/i })).toBeVisible();
     await page.reload();
@@ -30,8 +27,7 @@ test.describe("demo auth panel", () => {
 
   test("mentor demo account opens the mentor workspace", async ({ page }) => {
     await page.goto("/login");
-    await page.getByRole("button", { name: /use mentor/i }).click();
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: /sign in as mentor/i }).click();
     await expect(page).toHaveURL(/\/mentor/);
     await expect(page.getByRole("heading", { name: /hello, demo mentor/i })).toBeVisible();
     await logout(page);
@@ -40,13 +36,9 @@ test.describe("demo auth panel", () => {
   test("signup demo selection routes to login without registering", async ({ page }) => {
     await page.goto("/signup");
     await expect(page.getByRole("heading", { name: /try a shared demo account/i })).toBeVisible();
-    await page
-      .getByRole("button", { name: /use on sign-in/i })
-      .first()
-      .click();
-    await expect(page).toHaveURL(/\/login/);
-    await expect(page.getByLabel(/^email$/i)).toHaveValue(DEMO_ACCOUNTS.studentA.email);
-    await expect(page.getByLabel(/^password$/i)).toHaveValue(DEMO_ACCOUNTS.studentA.password);
+    await page.getByRole("button", { name: /sign in as student a/i }).click();
+    await expect(page).toHaveURL(/\/student/);
+    await expect(page.getByRole("heading", { name: /hello, demo student a/i })).toBeVisible();
   });
 
   test("normal student signup still works alongside demo accounts", async ({ page }) => {

@@ -38,6 +38,7 @@
     "demo:check": "npm run demo:check --workspace=@reviewdock/api",
     "perf:check": "npm run perf:check --workspace=@reviewdock/api",
     "demo:dev": "node scripts/demo-dev.mjs",
+    "start:hosted": "node scripts/start-hosted.mjs",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:ui": "npm run build && playwright test --ui"
   },
