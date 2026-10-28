@@ -127,7 +127,6 @@ export function AuthForm({
     autoSubmitStarted.current = demoFill.email;
     void authenticate("", demoFill.email, demoFill.password);
     // Demo one-click sign-in only. Manual typing never sets autoSubmit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when demo credentials are applied
   }, [mode, prefill, loginSeed]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {

@@ -1,7 +1,6 @@
 node_modules/
 .next/
 dist/
-coverage/
 *.tsbuildinfo
 next-env.d.ts
 .env
@@ -14,12 +13,4 @@ Thumbs.db
 .idea/
 .vscode/
 apps/api/src/generated/
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-/e2e/.runtime/
-/e2e/.auth/
-/.local/
-/docs/
 

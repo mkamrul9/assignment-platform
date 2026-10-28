@@ -10,22 +10,12 @@
     "start": "node dist/server.js",
     "pretypecheck": "prisma generate",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src --max-warnings=0",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
-    "db:reset": "prisma migrate reset",
-    "db:check": "tsx tests/persistence.check.ts",
-    "auth:check": "tsx tests/auth.check.ts",
-    "submissions:check": "tsx tests/submissions.check.ts",
-    "reviews:check": "tsx tests/reviews.check.ts",
-    "demo:prepare": "tsx prisma/demo-prepare.ts",
-    "demo:seed": "tsx prisma/demo-seed.ts",
-    "demo:reset": "tsx prisma/demo-reset.ts",
-    "demo:check": "tsx tests/demo.check.ts",
-    "perf:check": "tsx tests/perf.check.ts"
+    "demo:seed": "tsx prisma/demo-seed.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",

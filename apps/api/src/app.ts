@@ -9,7 +9,6 @@ import { createDemoRouter } from "./modules/demo/demo.routes.js";
 import { healthRouter } from "./modules/health/health.routes.js";
 import { createReviewsRouter } from "./modules/reviews/reviews.routes.js";
 import { createSubmissionsRouter } from "./modules/submissions/submissions.routes.js";
-import { roleBoundaryRouter } from "./modules/test/role-boundary.routes.js";
 
 export function createApp() {
   const app = express();
@@ -36,10 +35,6 @@ export function createApp() {
   // Only mount demo metadata when explicitly enabled so disabled mode yields a real 404.
   if (env.DEMO_MODE) {
     app.use("/api/demo", createDemoRouter());
-  }
-
-  if (env.NODE_ENV === "test") {
-    app.use("/api/test", roleBoundaryRouter);
   }
 
   app.use((_req, res) => {

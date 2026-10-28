@@ -2,7 +2,6 @@
  * Intentionally public synthetic demo identities.
  * These credentials may appear on auth screens when DEMO_MODE=1.
  * They must never match real mentor seed credentials from apps/api/.env.
- * Playwright mirrors the same values in e2e/demo-accounts.ts — keep them aligned.
  */
 
 export type DemoAccountPublic = {

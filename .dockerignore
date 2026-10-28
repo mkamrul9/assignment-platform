@@ -1,5 +1,4 @@
 .git
-.local
 .next
 **/.next
 node_modules
@@ -15,18 +14,9 @@ apps/web/.env.*
 .env.*
 !.env.example
 !**/.env.example
-test-results
-playwright-report
-playwright/.cache
-e2e/.runtime
-e2e/.auth
-blob-report
-coverage
 *.tsbuildinfo
 *.log
 .DS_Store
 Thumbs.db
 .idea
 .vscode
-docs
-agent-transcripts
